@@ -12,11 +12,7 @@ COPY ["package.json", "package-lock.json", "./"]
 
 RUN npm install --production
 
-#RUN npm install -g mocha
-
 COPY . .
-
-#RUN cd ./tests/transaction
 
 ENTRYPOINT npm test
 
