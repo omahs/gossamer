@@ -1,0 +1,8 @@
+services:
+  transaction:
+    platform: linux/amd64
+    build:
+      context: ./
+      dockerfile: transaction.Dockerfile
+    ports:
+      - 8546:8546
