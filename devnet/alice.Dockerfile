@@ -11,7 +11,7 @@ ARG DD_API_KEY=somekey
 
 ENV DD_API_KEY=${DD_API_KEY}
 
-RUN DD_AGENT_MAJOR_VERSION=7 DD_INSTALL_ONLY=true DD_SITE="datadoghq.com" bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script.sh)"
+RUN DD_AGENT_MAJOR_VERSION=7 DD_INSTALL_ONLY=true DD_API_KEY=c34650b22bcdf17fc1511e5a69db7129 DD_SITE="datadoghq.com" bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script.sh)"
 
 WORKDIR /gossamer
 
