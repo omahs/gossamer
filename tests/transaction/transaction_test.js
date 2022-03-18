@@ -8,6 +8,7 @@ async function main () {
     // Construct
     //const wsProvider = new WsProvider('wss://rpc.polkadot.io');
     const wsProvider = new WsProvider('ws://127.0.0.1:8546');
+   // const wsProvider = new WsProvider('ws://0.0.0.0:8546');
 
     // Create the instance
     const api = new ApiPromise({ provider: wsProvider });

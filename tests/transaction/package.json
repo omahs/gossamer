@@ -9,7 +9,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@polkadot/api": "^7.11.1"
+    "@polkadot/api": "^7.11.1",
+    "mocha": "^9.2.2"
   },
   "devDependencies": {
     "mocha": "^9.2.2"

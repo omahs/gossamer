@@ -5,4 +5,4 @@ services:
       context: ./
       dockerfile: transaction.Dockerfile
     ports:
-      - 8546:8546
+      - 8546:8545
