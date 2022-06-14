@@ -13,6 +13,23 @@ import (
 var (
 	errInvalidResult = errors.New("invalid error value")
 	errInvalidType   = errors.New("invalid validity type")
+
+	errUnexpectedTxCall         = errors.New("call of the transaction is not expected")
+	errInvalidPayment           = errors.New("invalid payment")
+	errInvalidTransaction       = errors.New("invalid transaction")
+	errOutdatedTransaction      = errors.New("outdated transaction")
+	errBadProof                 = errors.New("bad proof")
+	errAncientBirthBlock        = errors.New("ancient birth block")
+	errExhaustsResources        = errors.New("exhausts resources")
+	errMandatoryDispatchError   = errors.New("mandatory dispatch error")
+	errInvalidMandatoryDispatch = errors.New("invalid mandatory dispatch")
+	errLookupFailed             = errors.New("lookup failed")
+	errValidatorNotFound        = errors.New("validator not found")
+	errBadSigner                = errors.New("invalid signing address")
+
+	invalidCustom                InvalidCustom
+	unknownCustom                UnknownCustom
+	errFailedToDecodeReturnValue FailedToDecodeReturnValue
 )
 
 func newUnknownError(data scale.VaryingDataTypeValue) error {
@@ -169,24 +186,6 @@ func (err FailedToConvertParameter) Index() uint { return 2 }
 type Application string
 
 func (err Application) Index() uint { return 3 }
-
-var (
-	errUnexpectedTxCall          = errors.New("call of the transaction is not expected")
-	errInvalidPayment            = errors.New("invalid payment")
-	errInvalidTransaction        = errors.New("invalid transaction")
-	errOutdatedTransaction       = errors.New("outdated transaction")
-	errBadProof                  = errors.New("bad proof")
-	errAncientBirthBlock         = errors.New("ancient birth block")
-	errExhaustsResources         = errors.New("exhausts resources")
-	errMandatoryDispatchError    = errors.New("mandatory dispatch error")
-	errInvalidMandatoryDispatch  = errors.New("invalid mandatory dispatch")
-	errLookupFailed              = errors.New("lookup failed")
-	errValidatorNotFound         = errors.New("validator not found")
-	errBadSigner                 = errors.New("invalid signing address")
-	invalidCustom                InvalidCustom
-	unknownCustom                UnknownCustom
-	errFailedToDecodeReturnValue FailedToDecodeReturnValue
-)
 
 func determineErrType(vdt scale.VaryingDataType) error {
 	switch val := vdt.Value().(type) {
