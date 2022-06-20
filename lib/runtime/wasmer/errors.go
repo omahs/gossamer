@@ -27,13 +27,19 @@ var (
 	errValidatorNotFound        = errors.New("validator not found")
 	errBadSigner                = errors.New("invalid signing address")
 
-	invalidCustom                InvalidCustom
-	unknownCustom                UnknownCustom
-	errFailedToDecodeReturnValue FailedToDecodeReturnValue
+	invalidCustom                 InvalidCustom
+	unknownCustom                 UnknownCustom
+	errFailedToDecodeReturnValue  FailedToDecodeReturnValue
+	errFailedToConvertReturnValue FailedToConvertReturnValue
+	errFailedToConvertParameter   FailedToConvertParameter
 )
 
 func newUnknownError(data scale.VaryingDataTypeValue) error {
 	return fmt.Errorf("unknown error: %d", data)
+}
+
+func newApiError(data scale.VaryingDataTypeValue) error {
+	return fmt.Errorf("%d", data)
 }
 
 // UnmarshalError occurs when unmarshalling fails
@@ -52,6 +58,14 @@ type TransactionValidityError struct {
 
 func (e TransactionValidityError) Error() string {
 	return fmt.Sprintf("transaction validity error: %s", e.msg)
+}
+
+type ApiError struct {
+	msg error // description of error
+}
+
+func (e ApiError) Error() string {
+	return fmt.Sprintf("api error: %s", e.msg)
 }
 
 // Other Some error occurred
@@ -171,15 +185,15 @@ type BadSigner struct{}
 func (err BadSigner) Index() uint { return 10 }
 
 // API Errors
-type FailedToDecodeReturnValue string
+type FailedToDecodeReturnValue struct{} // This decodes when struct, not string
 
 func (err FailedToDecodeReturnValue) Index() uint { return 0 }
 
-type FailedToConvertReturnValue string
+type FailedToConvertReturnValue struct{}
 
 func (err FailedToConvertReturnValue) Index() uint { return 1 }
 
-type FailedToConvertParameter string
+type FailedToConvertParameter struct{}
 
 func (err FailedToConvertParameter) Index() uint { return 2 }
 
@@ -188,6 +202,7 @@ type Application string
 func (err Application) Index() uint { return 3 }
 
 func determineErrType(vdt scale.VaryingDataType) error {
+	// TODO use tims new PR to make this cleaner (2 funcs) once merged
 	switch val := vdt.Value().(type) {
 	// InvalidTransaction Error
 	case Call:
@@ -220,6 +235,16 @@ func determineErrType(vdt scale.VaryingDataType) error {
 		return &TransactionValidityError{errValidatorNotFound}
 	case UnknownCustom:
 		return &TransactionValidityError{newUnknownError(val)}
+
+	case FailedToDecodeReturnValue:
+		fmt.Println("here a: ", val)
+		return &ApiError{newApiError(val)}
+	case FailedToConvertReturnValue:
+		fmt.Println("here b")
+		return &ApiError{newApiError(val)}
+	case FailedToConvertParameter:
+		fmt.Println("here c")
+		return &ApiError{newApiError(val)}
 	}
 
 	fmt.Println("Why am i hitting this??")
@@ -230,7 +255,7 @@ func decodeValidity(res []byte) (*transaction.Validity, error) {
 	invalid := scale.MustNewVaryingDataType(Call{}, Payment{}, Future{}, Stale{}, BadProof{}, AncientBirthBlock{},
 		ExhaustsResources{}, invalidCustom, BadMandatory{}, MandatoryDispatch{})
 	unknown := scale.MustNewVaryingDataType(ValidityCannotLookup{}, NoUnsignedValidator{}, unknownCustom)
-	apiErr := scale.MustNewVaryingDataType(errFailedToDecodeReturnValue)
+	apiErr := scale.MustNewVaryingDataType(FailedToDecodeReturnValue{}, FailedToConvertReturnValue{}, FailedToConvertParameter{})
 
 	//Result<TransactionValidityResult, APIError>
 	//TransactionValidityResult<TransactionValidity, TransactionValidityError
@@ -240,6 +265,7 @@ func decodeValidity(res []byte) (*transaction.Validity, error) {
 	txnValidityResult := scale.NewResult(validTxn, txnValidityErrResult)
 
 	result := scale.NewResult(txnValidityResult, apiErr)
+	//result := scale.NewResult(txnValidityResult, "")
 
 	err := scale.Unmarshal(res, &result)
 	if err != nil {
@@ -248,9 +274,16 @@ func decodeValidity(res []byte) (*transaction.Validity, error) {
 
 	ok, err := result.Unwrap()
 	if err != nil {
+
 		//TODO implement this
 		// APIError
 		switch err := err.(type) {
+
+		case scale.WrappedErr:
+			fmt.Println("in api wrapped err")
+			//fmt.Println("err is: ", err.Err)
+			return nil, determineErrType(err.Err.(scale.VaryingDataType))
+			//return nil, errInvalidResult
 		default:
 			fmt.Println(err)
 			return nil, errInvalidResult
