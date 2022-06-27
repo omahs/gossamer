@@ -21,21 +21,23 @@ func (in *Instance) ValidateTransaction(e types.Extrinsic) (*transaction.Validit
 		fmt.Println("err1")
 		return nil, err
 	}
-
-	// jimmy notes: I think this is wrong TODO fix
-	// ret[0] should be validity case
-	// ret[1] should be API err
-	// I think all of this can be handled by my new error handler func yay
-	if ret[0] != 0 {
-		fmt.Println("err2")
-		fmt.Println(ret)
-		return nil, runtime.NewValidateTransactionError(ret)
-	}
-
-	v := transaction.NewValidity(0, [][]byte{{}}, [][]byte{{}}, 0, false)
-	err = scale.Unmarshal(ret[1:], v)
-
-	return v, err
+	return decodeValidity(ret)
+	//
+	//
+	//// jimmy notes: I think this is wrong TODO fix
+	//// ret[0] should be validity case
+	//// ret[1] should be API err
+	//// I think all of this can be handled by my new error handler func yay
+	//if ret[0] != 0 {
+	//	fmt.Println("err2")
+	//	fmt.Println(ret)
+	//	return nil, runtime.NewValidateTransactionError(ret)
+	//}
+	//
+	//v := transaction.NewValidity(0, [][]byte{{}}, [][]byte{{}}, 0, false)
+	//err = scale.Unmarshal(ret[1:], v)
+	//
+	//return v, err
 }
 
 // Version calls runtime function Core_Version
