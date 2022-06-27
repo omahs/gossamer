@@ -14,24 +14,25 @@ var (
 	errInvalidResult = errors.New("invalid error value")
 	errInvalidType   = errors.New("invalid validity type")
 
-	errUnexpectedTxCall         = errors.New("call of the transaction is not expected")
-	errInvalidPayment           = errors.New("invalid payment")
-	errInvalidTransaction       = errors.New("invalid transaction")
-	errOutdatedTransaction      = errors.New("outdated transaction")
-	errBadProof                 = errors.New("bad proof")
-	errAncientBirthBlock        = errors.New("ancient birth block")
-	errExhaustsResources        = errors.New("exhausts resources")
-	errMandatoryDispatchError   = errors.New("mandatory dispatch error")
-	errInvalidMandatoryDispatch = errors.New("invalid mandatory dispatch")
-	errLookupFailed             = errors.New("lookup failed")
-	errValidatorNotFound        = errors.New("validator not found")
-	errBadSigner                = errors.New("invalid signing address")
+	errUnexpectedTxCall           = errors.New("call of the transaction is not expected")
+	errInvalidPayment             = errors.New("invalid payment")
+	errInvalidTransaction         = errors.New("invalid transaction")
+	errOutdatedTransaction        = errors.New("outdated transaction")
+	errBadProof                   = errors.New("bad proof")
+	errAncientBirthBlock          = errors.New("ancient birth block")
+	errExhaustsResources          = errors.New("exhausts resources")
+	errMandatoryDispatchError     = errors.New("mandatory dispatch error")
+	errInvalidMandatoryDispatch   = errors.New("invalid mandatory dispatch")
+	errLookupFailed               = errors.New("lookup failed")
+	errValidatorNotFound          = errors.New("validator not found")
+	errBadSigner                  = errors.New("invalid signing address")
+	errFailedToDecodeReturnValue  = errors.New("failed to decode return value")
+	errFailedToConvertReturnValue = errors.New("failed to convert return value from runtime to node")
+	errFailedToConvertParameter   = errors.New("failed to convert parameter from node to runtime")
+	errTransparentApi             = errors.New("transparent ApiError")
 
-	invalidCustom                 InvalidCustom
-	unknownCustom                 UnknownCustom
-	errFailedToDecodeReturnValue  FailedToDecodeReturnValue
-	errFailedToConvertReturnValue FailedToConvertReturnValue
-	errFailedToConvertParameter   FailedToConvertParameter
+	invalidCustom InvalidCustom
+	unknownCustom UnknownCustom
 )
 
 func newUnknownError(data scale.VaryingDataTypeValue) error {
@@ -197,7 +198,7 @@ type FailedToConvertParameter struct{}
 
 func (err FailedToConvertParameter) Index() uint { return 2 }
 
-type Application string
+type Application struct{}
 
 func (err Application) Index() uint { return 3 }
 
@@ -236,18 +237,17 @@ func determineErrType(vdt scale.VaryingDataType) error {
 	case UnknownCustom:
 		return &TransactionValidityError{newUnknownError(val)}
 
+		//ApiErr
 	case FailedToDecodeReturnValue:
-		fmt.Println("here a: ", val)
-		return &ApiError{newApiError(val)}
+		return &ApiError{errFailedToDecodeReturnValue}
 	case FailedToConvertReturnValue:
-		fmt.Println("here b")
-		return &ApiError{newApiError(val)}
+		return &ApiError{errFailedToConvertReturnValue}
 	case FailedToConvertParameter:
-		fmt.Println("here c")
-		return &ApiError{newApiError(val)}
+		return &ApiError{errFailedToConvertParameter}
+	case Application:
+		return &ApiError{errTransparentApi}
 	}
 
-	fmt.Println("Why am i hitting this??")
 	return errInvalidResult
 }
 
@@ -255,18 +255,14 @@ func decodeValidity(res []byte) (*transaction.Validity, error) {
 	invalid := scale.MustNewVaryingDataType(Call{}, Payment{}, Future{}, Stale{}, BadProof{}, AncientBirthBlock{},
 		ExhaustsResources{}, invalidCustom, BadMandatory{}, MandatoryDispatch{})
 	unknown := scale.MustNewVaryingDataType(ValidityCannotLookup{}, NoUnsignedValidator{}, unknownCustom)
-	apiErr := scale.MustNewVaryingDataType(FailedToDecodeReturnValue{}, FailedToConvertReturnValue{}, FailedToConvertParameter{})
-
-	//Result<TransactionValidityResult, APIError>
-	//TransactionValidityResult<TransactionValidity, TransactionValidityError
+	apiErr := scale.MustNewVaryingDataType(FailedToDecodeReturnValue{}, FailedToConvertReturnValue{},
+		FailedToConvertParameter{}, Application{})
 
 	validTxn := &transaction.Validity{}
 	txnValidityErrResult := scale.NewResult(invalid, unknown)
 	txnValidityResult := scale.NewResult(validTxn, txnValidityErrResult)
 
 	result := scale.NewResult(txnValidityResult, apiErr)
-	//result := scale.NewResult(txnValidityResult, "")
-
 	err := scale.Unmarshal(res, &result)
 	if err != nil {
 		return nil, &UnmarshalError{err.Error()}
@@ -274,16 +270,10 @@ func decodeValidity(res []byte) (*transaction.Validity, error) {
 
 	ok, err := result.Unwrap()
 	if err != nil {
-
-		//TODO implement this
-		// APIError
+		// ApiError
 		switch err := err.(type) {
-
 		case scale.WrappedErr:
-			fmt.Println("in api wrapped err")
-			//fmt.Println("err is: ", err.Err)
 			return nil, determineErrType(err.Err.(scale.VaryingDataType))
-			//return nil, errInvalidResult
 		default:
 			fmt.Println(err)
 			return nil, errInvalidResult
@@ -292,12 +282,9 @@ func decodeValidity(res []byte) (*transaction.Validity, error) {
 		// TxnValidity
 		switch o := ok.(type) {
 		case scale.Result:
-			// TxnValidityErr Result
 			txnValidityRes, err := o.Unwrap()
 			if err != nil {
 				switch errType := err.(type) {
-
-				// Err wrapping result
 				case scale.WrappedErr:
 					errResult := errType.Err.(scale.Result)
 					ok, err = errResult.Unwrap()

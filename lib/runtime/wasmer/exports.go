@@ -22,6 +22,10 @@ func (in *Instance) ValidateTransaction(e types.Extrinsic) (*transaction.Validit
 		return nil, err
 	}
 
+	// jimmy notes: I think this is wrong TODO fix
+	// ret[0] should be validity case
+	// ret[1] should be API err
+	// I think all of this can be handled by my new error handler func yay
 	if ret[0] != 0 {
 		fmt.Println("err2")
 		fmt.Println(ret)
