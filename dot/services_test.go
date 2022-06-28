@@ -21,7 +21,6 @@ import (
 	"github.com/ChainSafe/gossamer/lib/grandpa"
 	"github.com/ChainSafe/gossamer/lib/keystore"
 	"github.com/ChainSafe/gossamer/lib/runtime"
-	"github.com/ChainSafe/gossamer/lib/runtime/life"
 	rtstorage "github.com/ChainSafe/gossamer/lib/runtime/storage"
 	"github.com/ChainSafe/gossamer/lib/runtime/wasmer"
 	"github.com/golang/mock/gomock"
@@ -467,8 +466,8 @@ func Test_createRuntime(t *testing.T) {
 	t.Parallel()
 	cfg := NewTestConfig(t)
 
-	cfgLife := NewTestConfig(t)
-	cfgLife.Core.WasmInterpreter = life.Name
+	cfgWasmer := NewTestConfig(t)
+	cfgWasmer.Core.WasmInterpreter = wasmer.Name
 
 	type args struct {
 		cfg *Config
@@ -492,10 +491,10 @@ func Test_createRuntime(t *testing.T) {
 		{
 			name: "wasmer life",
 			args: args{
-				cfg: cfgLife,
+				cfg: cfgWasmer,
 				ns:  runtime.NodeStorage{},
 			},
-			expectedType: &life.Instance{},
+			expectedType: &wasmer.Instance{},
 			err:          nil,
 		},
 	}
