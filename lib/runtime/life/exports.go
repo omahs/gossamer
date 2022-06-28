@@ -6,12 +6,12 @@ package life
 import (
 	"errors"
 	"fmt"
+	"github.com/ChainSafe/gossamer/pkg/scale"
 	"strings"
 
 	"github.com/ChainSafe/gossamer/dot/types"
 	"github.com/ChainSafe/gossamer/lib/runtime"
 	"github.com/ChainSafe/gossamer/lib/transaction"
-	"github.com/ChainSafe/gossamer/pkg/scale"
 )
 
 // ValidateTransaction runs the extrinsic through runtime function

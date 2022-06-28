@@ -447,7 +447,7 @@ func TestHandleChainReorg_WithReorg_Transactions(t *testing.T) {
 }
 
 func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
-	t.Skip()
+	//t.Skip()
 	accountInfo := types.AccountInfo{
 		Nonce: 0,
 		Data: types.AccountData{
@@ -506,7 +506,7 @@ func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
 }
 
 func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
-	t.Skip()
+	//t.Skip()
 	accountInfo := types.AccountInfo{
 		Nonce: 0,
 		Data: types.AccountData{

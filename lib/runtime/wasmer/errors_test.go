@@ -4,6 +4,8 @@
 package wasmer
 
 import (
+	"fmt"
+	"github.com/ChainSafe/gossamer/lib/common"
 	"github.com/ChainSafe/gossamer/lib/transaction"
 	"github.com/ChainSafe/gossamer/pkg/scale"
 	"testing"
@@ -12,7 +14,7 @@ import (
 )
 
 func TestApplyExtrinsicErrors(t *testing.T) {
-	testValidity := &transaction.Validity{
+	testValidity := transaction.Validity{
 		Priority: 0x3e8,
 		Requires: [][]byte{{0xb5, 0x47, 0xb1, 0x90, 0x37, 0x10, 0x7e, 0x1f, 0x79,
 			0x4c, 0xa8, 0x69, 0x0, 0xa1, 0xb5, 0x98}},
@@ -23,11 +25,19 @@ func TestApplyExtrinsicErrors(t *testing.T) {
 	}
 	encValidity, err := scale.Marshal(testValidity)
 	require.NoError(t, err)
-	validByte := []byte{0, 0}
+	fmt.Println(encValidity)
+	validByte := []byte{0}
 	validByte = append(validByte, encValidity...)
 
-	apiErrBytes := []byte{1, 0}
-	apiErrBytes = append(apiErrBytes, []byte("test err")...)
+	// test decodeing
+	enc := common.MustHexToBytes("0x464c490a19b68b00000490d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d00000000feffffffffffffff01")
+	testVal := &transaction.Validity{}
+	err = scale.Unmarshal(enc, testVal)
+	require.NoError(t, err)
+
+	valTest := common.MustHexToBytes("0x00464c490a19b68b00000490d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d00000000feffffffffffffff01")
+	fmt.Println(valTest)
+
 	testCases := []struct {
 		name          string
 		test          []byte
@@ -37,28 +47,28 @@ func TestApplyExtrinsicErrors(t *testing.T) {
 	}{
 		{
 			name:   "lookup failed",
-			test:   []byte{0, 1, 1, 0},
+			test:   []byte{1, 1, 0},
 			expErr: &TransactionValidityError{errLookupFailed},
 		},
 		{
 			name:   "unexpected transaction call",
-			test:   []byte{0, 1, 0, 0},
+			test:   []byte{1, 0, 0},
 			expErr: &TransactionValidityError{errUnexpectedTxCall},
+		},
+		{
+			name:   "ancient birth block",
+			test:   []byte{1, 0, 5},
+			expErr: &TransactionValidityError{errAncientBirthBlock},
 		},
 		{
 			name:        "valid path",
 			test:        validByte,
-			expValidity: testValidity,
+			expValidity: &testValidity,
 		},
 		{
-			name:   "application error",
-			test:   []byte{1, 3},
-			expErr: &ApiError{errTransparentApi},
-		},
-		{
-			name:   "api error",
-			test:   []byte{1, 0, 5}, // taken from core integration tests
-			expErr: &ApiError{errFailedToDecodeReturnValue},
+			name:        "this should decode correctly i think",
+			test:        valTest,
+			expValidity: testVal,
 		},
 	}
 

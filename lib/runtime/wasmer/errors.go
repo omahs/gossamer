@@ -255,62 +255,41 @@ func decodeValidity(res []byte) (*transaction.Validity, error) {
 	invalid := scale.MustNewVaryingDataType(Call{}, Payment{}, Future{}, Stale{}, BadProof{}, AncientBirthBlock{},
 		ExhaustsResources{}, invalidCustom, BadMandatory{}, MandatoryDispatch{})
 	unknown := scale.MustNewVaryingDataType(ValidityCannotLookup{}, NoUnsignedValidator{}, unknownCustom)
-	apiErr := scale.MustNewVaryingDataType(FailedToDecodeReturnValue{}, FailedToConvertReturnValue{},
-		FailedToConvertParameter{}, Application{})
 
-	validTxn := &transaction.Validity{}
+	validTxn := transaction.Validity{}
 	txnValidityErrResult := scale.NewResult(invalid, unknown)
 	txnValidityResult := scale.NewResult(validTxn, txnValidityErrResult)
 
-	result := scale.NewResult(txnValidityResult, apiErr)
-	err := scale.Unmarshal(res, &result)
+	err := scale.Unmarshal(res, &txnValidityResult)
 	if err != nil {
 		return nil, &UnmarshalError{err.Error()}
 	}
 
-	ok, err := result.Unwrap()
+	txnValidityRes, err := txnValidityResult.Unwrap()
 	if err != nil {
-		// ApiError
-		switch err := err.(type) {
+		switch errType := err.(type) {
 		case scale.WrappedErr:
-			return nil, determineErrType(err.Err.(scale.VaryingDataType))
-		default:
-			fmt.Println(err)
-			return nil, errInvalidResult
-		}
-	} else {
-		// TxnValidity
-		switch o := ok.(type) {
-		case scale.Result:
-			txnValidityRes, err := o.Unwrap()
+			errResult := errType.Err.(scale.Result)
+			txnValidityRes, err = errResult.Unwrap()
 			if err != nil {
-				switch errType := err.(type) {
+				switch err := err.(type) {
 				case scale.WrappedErr:
-					errResult := errType.Err.(scale.Result)
-					ok, err = errResult.Unwrap()
-					if err != nil {
-						switch err := err.(type) {
-						case scale.WrappedErr:
-							return nil, determineErrType(err.Err.(scale.VaryingDataType))
-						default:
-							return nil, errInvalidResult
-						}
-					} else {
-						return nil, determineErrType(ok.(scale.VaryingDataType))
-					}
+					return nil, determineErrType(err.Err.(scale.VaryingDataType))
 				default:
 					return nil, errInvalidResult
 				}
 			} else {
-				switch validity := txnValidityRes.(type) {
-				case *transaction.Validity:
-					return validity, nil
-				default:
-					return nil, errInvalidType
-				}
+				return nil, determineErrType(txnValidityRes.(scale.VaryingDataType))
 			}
 		default:
 			return nil, errInvalidResult
+		}
+	} else {
+		switch validity := txnValidityRes.(type) {
+		case transaction.Validity:
+			return &validity, nil
+		default:
+			return nil, errInvalidType
 		}
 	}
 }
