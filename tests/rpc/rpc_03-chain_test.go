@@ -328,7 +328,7 @@ func callAndSubscribeWebsocket(ctx context.Context, t *testing.T,
 	var target subscription.ResponseJSON
 	err = connection.ReadJSON(&target)
 	require.NoError(t, err, "cannot read websocket message")
-	assert.Equal(t, float64(id), target.ID, "request id mismatch")
+	assert.Equal(t, id, target.ID, "request id mismatch")
 	assert.NotZero(t, target.Result, "subscription id is 0")
 
 	for i := uint(0); i < numberOfMesages; i++ {
