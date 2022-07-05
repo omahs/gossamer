@@ -5,10 +5,11 @@ package wasmer
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/ChainSafe/gossamer/lib/common"
 	"github.com/ChainSafe/gossamer/lib/transaction"
 	"github.com/ChainSafe/gossamer/pkg/scale"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 )
@@ -30,12 +31,14 @@ func TestApplyExtrinsicErrors(t *testing.T) {
 	validByte = append(validByte, encValidity...)
 
 	// test decodeing
-	enc := common.MustHexToBytes("0x464c490a19b68b00000490d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d00000000feffffffffffffff01")
+	enc := common.MustHexToBytes("0x464c490a19b68b00000490d43593c715fdd31c61141abd04a99fd6822c855885" +
+		"4ccde39a5684e7a56da27d00000000feffffffffffffff01")
 	testVal := &transaction.Validity{}
 	err = scale.Unmarshal(enc, testVal)
 	require.NoError(t, err)
 
-	valTest := common.MustHexToBytes("0x00464c490a19b68b00000490d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d00000000feffffffffffffff01")
+	valTest := common.MustHexToBytes("0x00464c490a19b68b00000490d43593c715fdd31c61141abd04a99fd6822c8" +
+		"558854ccde39a5684e7a56da27d00000000feffffffffffffff01")
 	fmt.Println(valTest)
 
 	testCases := []struct {

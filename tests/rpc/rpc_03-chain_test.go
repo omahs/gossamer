@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"testing"
 	"time"
 
@@ -170,7 +171,7 @@ func TestChainSubscriptionRPC(t *testing.T) {
 
 			remainingExpected := subscription.Params{
 				Result:         map[string]interface{}{},
-				SubscriptionID: string(1),
+				SubscriptionID: strconv.Itoa(1),
 			}
 			assert.Equal(t, remainingExpected, params)
 		}
@@ -245,7 +246,7 @@ func TestChainSubscriptionRPC(t *testing.T) {
 
 			remainingExpected := subscription.Params{
 				Result:         map[string]interface{}{},
-				SubscriptionID: string(1),
+				SubscriptionID: strconv.Itoa(1),
 			}
 			assert.Equal(t, remainingExpected, params)
 		}

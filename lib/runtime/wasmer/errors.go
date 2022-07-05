@@ -6,6 +6,7 @@ package wasmer
 import (
 	"errors"
 	"fmt"
+
 	"github.com/ChainSafe/gossamer/lib/transaction"
 	"github.com/ChainSafe/gossamer/pkg/scale"
 )
@@ -29,7 +30,7 @@ var (
 	errFailedToDecodeReturnValue  = errors.New("failed to decode return value")
 	errFailedToConvertReturnValue = errors.New("failed to convert return value from runtime to node")
 	errFailedToConvertParameter   = errors.New("failed to convert parameter from node to runtime")
-	errTransparentApi             = errors.New("transparent ApiError")
+	errTransparentAPI             = errors.New("transparent APIError")
 
 	invalidCustom InvalidCustom
 	unknownCustom UnknownCustom
@@ -37,10 +38,6 @@ var (
 
 func newUnknownError(data scale.VaryingDataTypeValue) error {
 	return fmt.Errorf("unknown error: %d", data)
-}
-
-func newApiError(data scale.VaryingDataTypeValue) error {
-	return fmt.Errorf("%d", data)
 }
 
 // UnmarshalError occurs when unmarshalling fails
@@ -61,11 +58,13 @@ func (e TransactionValidityError) Error() string {
 	return fmt.Sprintf("transaction validity error: %s", e.msg)
 }
 
-type ApiError struct {
+// APIError An error describing which API call failed.
+type APIError struct {
 	msg error // description of error
 }
 
-func (e ApiError) Error() string {
+// Error wrapper for APIError
+func (e APIError) Error() string {
 	return fmt.Sprintf("api error: %s", e.msg)
 }
 
@@ -185,21 +184,28 @@ type BadSigner struct{}
 // Index Returns VDT index
 func (err BadSigner) Index() uint { return 10 }
 
-// API Errors
+// FailedToDecodeReturnValue APIError
 type FailedToDecodeReturnValue struct{} // This decodes when struct, not string
 
+// Index Returns VDT index
 func (err FailedToDecodeReturnValue) Index() uint { return 0 }
 
+// FailedToConvertReturnValue APIError
 type FailedToConvertReturnValue struct{}
 
+// Index Returns VDT index
 func (err FailedToConvertReturnValue) Index() uint { return 1 }
 
+// FailedToConvertParameter APIError
 type FailedToConvertParameter struct{}
 
+// Index Returns VDT index
 func (err FailedToConvertParameter) Index() uint { return 2 }
 
+// Application catch all for APIError
 type Application struct{}
 
+// Index Returns VDT index
 func (err Application) Index() uint { return 3 }
 
 func determineErrType(vdt scale.VaryingDataType) error {
@@ -239,13 +245,13 @@ func determineErrType(vdt scale.VaryingDataType) error {
 
 		//ApiErr
 	case FailedToDecodeReturnValue:
-		return &ApiError{errFailedToDecodeReturnValue}
+		return &APIError{errFailedToDecodeReturnValue}
 	case FailedToConvertReturnValue:
-		return &ApiError{errFailedToConvertReturnValue}
+		return &APIError{errFailedToConvertReturnValue}
 	case FailedToConvertParameter:
-		return &ApiError{errFailedToConvertParameter}
+		return &APIError{errFailedToConvertParameter}
 	case Application:
-		return &ApiError{errTransparentApi}
+		return &APIError{errTransparentAPI}
 	}
 
 	return errInvalidResult
