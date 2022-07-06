@@ -107,7 +107,8 @@ func generateConfig(t *testing.T) (*wasmer.Config, *trie.Trie) {
 	}, genTrie
 }
 
-func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.AccountInfo, rt runtime.Instance, service *Service) []byte {
+func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.AccountInfo,
+	rt runtime.Instance, service *Service) []byte {
 	t.Helper()
 	cfg, genTrie := generateConfig(t)
 

@@ -23,6 +23,7 @@ import (
 	"github.com/ChainSafe/gossamer/lib/runtime"
 	rtstorage "github.com/ChainSafe/gossamer/lib/runtime/storage"
 	"github.com/ChainSafe/gossamer/lib/runtime/wasmer"
+
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -209,7 +210,7 @@ func Test_nodeBuilder_createBABEService(t *testing.T) {
 			mockBabeBuilder := NewMockServiceBuilder(ctrl)
 			mockBabeBuilder.EXPECT().NewServiceIFace(
 				gomock.AssignableToTypeOf(&babe.ServiceConfig{})).DoAndReturn(func(cfg *babe.ServiceConfig) (babe.
-			ServiceIFace, error) {
+				ServiceIFace, error) {
 				if reflect.ValueOf(cfg.BlockState).Kind() == reflect.Ptr && reflect.ValueOf(cfg.BlockState).IsNil() {
 					return nil, babe.ErrNilBlockState
 				}
@@ -465,7 +466,7 @@ func Test_nodeBuilder_createGRANDPAService(t *testing.T) {
 func Test_createRuntime(t *testing.T) {
 	t.Parallel()
 	cfg := NewTestConfig(t)
-	
+
 	type args struct {
 		cfg *Config
 		ns  runtime.NodeStorage
