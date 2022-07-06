@@ -82,7 +82,7 @@ func newTestDigest(t *testing.T, slotNumber uint64) scale.VaryingDataTypeSlice {
 	return vdts
 }
 
-func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.AccountInfo) ([]byte, runtime.Instance) {
+func generateConfig(t *testing.T) (*wasmer.Config, *trie.Trie) {
 	t.Helper()
 	projectRootPath := filepath.Join(utils.GetProjectRootPathTest(t), "chain/gssmr/genesis.json")
 	gen, err := genesis.NewGenesisFromJSONRaw(projectRootPath)
@@ -97,14 +97,19 @@ func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.Acco
 	nodeStorage := runtime.NodeStorage{
 		BaseDB: runtime.NewInMemoryDB(t),
 	}
-	cfg := &wasmer.Config{
+	return &wasmer.Config{
 		InstanceConfig: runtime.InstanceConfig{
 			Storage:     genState,
 			LogLvl:      log.Error,
 			NodeStorage: nodeStorage,
 		},
 		Imports: nil,
-	}
+	}, genTrie
+}
+
+func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.AccountInfo, rt runtime.Instance, service *Service) []byte {
+	t.Helper()
+	cfg, genTrie := generateConfig(t)
 
 	rt, err := wasmer.NewRuntimeFromGenesis(cfg)
 	require.NoError(t, err)
@@ -122,9 +127,12 @@ func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.Acco
 		StateRoot: genTrie.MustHash(),
 	}
 
+	bestBlockHash := service.blockState.BestBlockHash()
+	fmt.Println("best Block: ", bestBlockHash)
+	fmt.Println("gen Block: ", genesisHeader.Hash())
 	// Hash of encrypted centrifuge extrinsic
 	testCallArguments := []byte{0xab, 0xcd}
-	extHex := runtime.NewTestExtrinsic(t, rt, genesisHeader.Hash(), genesisHeader.Hash(),
+	extHex := runtime.NewTestExtrinsic(t, rt, genesisHeader.Hash(), bestBlockHash,
 		0, "System.remark", testCallArguments)
 
 	extBytes := common.MustHexToBytes(extHex)
@@ -133,7 +141,7 @@ func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.Acco
 	//extBytes = append([]byte{txnType}, append(extBytes, genesisHeader.Hash().ToBytes()...)...)
 
 	//runtime.InitializeRuntimeToTest(t, rt, genesisHeader.Hash())
-	return extBytes, rt
+	return extBytes
 }
 
 func TestStartService(t *testing.T) {
@@ -460,25 +468,37 @@ func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
 	keyring, err := keystore.NewSr25519Keyring()
 	require.NoError(t, err)
 	alicePub := common.MustHexToBytes(keyring.Alice().Public().Hex())
-	encExt, runtimeInstance := generateTestValidRemarkTxns(t, alicePub, accountInfo)
 
-	cfg := &Config{
-		Runtime: runtimeInstance,
-	}
-
+	config, _ := generateConfig(t)
 	ctrl := gomock.NewController(t)
 	telemetryMock := NewMockClient(ctrl)
 	telemetryMock.EXPECT().SendMessage(gomock.Any()).AnyTimes()
 
 	transactionState := state.NewTransactionState(telemetryMock)
+
+	runtimeInstance, err := wasmer.NewRuntimeFromGenesis(config)
+	require.NoError(t, err)
+	cfg := &Config{
+		Runtime: runtimeInstance,
+	}
+
+	service := NewTestService(t, cfg)
+	service.transactionState = transactionState
+
+	encExt := generateTestValidRemarkTxns(t, alicePub, accountInfo, runtimeInstance, service)
+
 	tx := &transaction.ValidTransaction{
 		Extrinsic: types.Extrinsic(encExt),
 		Validity:  &transaction.Validity{Priority: 1},
 	}
 	_ = transactionState.AddToPool(tx)
 
-	service := NewTestService(t, cfg)
-	service.transactionState = transactionState
+	//cfg := &Config{
+	//	Runtime: runtimeInstance,
+	//}
+	//
+	//service := NewTestService(t, cfg)
+	//service.transactionState = transactionState
 	//err = service.HandleSubmittedExtrinsic(encExt)
 	//require.NoError(t, err)
 	// provides is a list of transaction hashes that depend on this tx, see:
@@ -505,55 +525,55 @@ func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
 	require.Nil(t, head)
 }
 
-func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
-	//t.Skip()
-	accountInfo := types.AccountInfo{
-		Nonce: 0,
-		Data: types.AccountData{
-			Free:       scale.MustNewUint128(big.NewInt(1152921504606846976)),
-			Reserved:   scale.MustNewUint128(big.NewInt(0)),
-			MiscFrozen: scale.MustNewUint128(big.NewInt(0)),
-			FreeFrozen: scale.MustNewUint128(big.NewInt(0)),
-		},
-	}
-	keyring, err := keystore.NewSr25519Keyring()
-	require.NoError(t, err)
-	alicePub := common.MustHexToBytes(keyring.Alice().Public().Hex())
-	extrinsicBytes, _ := generateTestValidRemarkTxns(t, alicePub, accountInfo)
-
-	ctrl := gomock.NewController(t)
-	telemetryMock := NewMockClient(ctrl)
-	telemetryMock.EXPECT().SendMessage(gomock.Any()).AnyTimes()
-
-	ts := state.NewTransactionState(telemetryMock)
-
-	// Maybe replace validity
-	tx := &transaction.ValidTransaction{
-		Extrinsic: types.Extrinsic(extrinsicBytes),
-		Validity:  &transaction.Validity{Priority: 1},
-	}
-
-	ts.AddToPool(tx)
-
-	s := &Service{
-		transactionState: ts,
-	}
-
-	s.maintainTransactionPool(&types.Block{
-		Body: types.Body([]types.Extrinsic{extrinsicBytes}),
-	})
-
-	res := []*transaction.ValidTransaction{}
-	for {
-		tx := ts.Pop()
-		if tx == nil {
-			break
-		}
-		res = append(res, tx)
-	}
-	// Extrinsic is removed. so empty res
-	require.Empty(t, res)
-}
+//func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
+//	//t.Skip()
+//	accountInfo := types.AccountInfo{
+//		Nonce: 0,
+//		Data: types.AccountData{
+//			Free:       scale.MustNewUint128(big.NewInt(1152921504606846976)),
+//			Reserved:   scale.MustNewUint128(big.NewInt(0)),
+//			MiscFrozen: scale.MustNewUint128(big.NewInt(0)),
+//			FreeFrozen: scale.MustNewUint128(big.NewInt(0)),
+//		},
+//	}
+//	keyring, err := keystore.NewSr25519Keyring()
+//	require.NoError(t, err)
+//	alicePub := common.MustHexToBytes(keyring.Alice().Public().Hex())
+//	extrinsicBytes := generateTestValidRemarkTxns(t, alicePub, accountInfo)
+//
+//	ctrl := gomock.NewController(t)
+//	telemetryMock := NewMockClient(ctrl)
+//	telemetryMock.EXPECT().SendMessage(gomock.Any()).AnyTimes()
+//
+//	ts := state.NewTransactionState(telemetryMock)
+//
+//	// Maybe replace validity
+//	tx := &transaction.ValidTransaction{
+//		Extrinsic: types.Extrinsic(extrinsicBytes),
+//		Validity:  &transaction.Validity{Priority: 1},
+//	}
+//
+//	ts.AddToPool(tx)
+//
+//	s := &Service{
+//		transactionState: ts,
+//	}
+//
+//	s.maintainTransactionPool(&types.Block{
+//		Body: types.Body([]types.Extrinsic{extrinsicBytes}),
+//	})
+//
+//	res := []*transaction.ValidTransaction{}
+//	for {
+//		tx := ts.Pop()
+//		if tx == nil {
+//			break
+//		}
+//		res = append(res, tx)
+//	}
+//	// Extrinsic is removed. so empty res
+//	require.Empty(t, res)
+//}
 
 func TestService_GetRuntimeVersion(t *testing.T) {
 	s := NewTestService(t, nil)
