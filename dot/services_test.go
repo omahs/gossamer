@@ -209,7 +209,7 @@ func Test_nodeBuilder_createBABEService(t *testing.T) {
 			mockBabeBuilder := NewMockServiceBuilder(ctrl)
 			mockBabeBuilder.EXPECT().NewServiceIFace(
 				gomock.AssignableToTypeOf(&babe.ServiceConfig{})).DoAndReturn(func(cfg *babe.ServiceConfig) (babe.
-				ServiceIFace, error) {
+			ServiceIFace, error) {
 				if reflect.ValueOf(cfg.BlockState).Kind() == reflect.Ptr && reflect.ValueOf(cfg.BlockState).IsNil() {
 					return nil, babe.ErrNilBlockState
 				}
@@ -448,7 +448,7 @@ func Test_nodeBuilder_createGRANDPAService(t *testing.T) {
 			networkSrvc, err := network.NewService(networkConfig)
 			require.NoError(t, err)
 			builder := nodeBuilder{}
-			got, err := builder.createGRANDPAService(cfg, stateSrvc, nil, tt.ks, networkSrvc,
+			got, err := builder.createGRANDPAService(cfg, stateSrvc, tt.ks, networkSrvc,
 				nil)
 			assert.ErrorIs(t, err, tt.err)
 			// TODO: create interface for grandpa.NewService to enable testing with assert.Equal
@@ -465,10 +465,7 @@ func Test_nodeBuilder_createGRANDPAService(t *testing.T) {
 func Test_createRuntime(t *testing.T) {
 	t.Parallel()
 	cfg := NewTestConfig(t)
-
-	cfgWasmer := NewTestConfig(t)
-	cfgWasmer.Core.WasmInterpreter = wasmer.Name
-
+	
 	type args struct {
 		cfg *Config
 		ns  runtime.NodeStorage
@@ -483,15 +480,6 @@ func Test_createRuntime(t *testing.T) {
 			name: "wasmer runtime",
 			args: args{
 				cfg: cfg,
-				ns:  runtime.NodeStorage{},
-			},
-			expectedType: &wasmer.Instance{},
-			err:          nil,
-		},
-		{
-			name: "wasmer life",
-			args: args{
-				cfg: cfgWasmer,
 				ns:  runtime.NodeStorage{},
 			},
 			expectedType: &wasmer.Instance{},
