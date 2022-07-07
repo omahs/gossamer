@@ -431,13 +431,13 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 
 		rt.SetContextStorage(ts)
 
-		externalExt, err := s.BuildExternalTransaction(rt, tx.Extrinsic)
-		if err != nil {
-			fmt.Println("errrrr")
-			logger.Errorf("Unable to build transaction \n")
-		}
+		//externalExt, err := s.BuildExternalTransaction(rt, tx.Extrinsic)
+		//if err != nil {
+		//	fmt.Println("errrrr")
+		//	logger.Errorf("Unable to build transaction \n")
+		//}
 
-		txnValidity, err := rt.ValidateTransaction(externalExt)
+		txnValidity, err := rt.ValidateTransaction(tx.Extrinsic)
 		if err != nil {
 			fmt.Println("unable to validate tx")
 			fmt.Println(err)
@@ -454,6 +454,46 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 		logger.Tracef("moved transaction %s to queue", h)
 	}
 }
+
+//
+//// Dev version
+//func (s *Service) maintainTransactionPool(block *types.Block) {
+//	// remove extrinsics included in a block
+//	for _, ext := range block.Body {
+//		s.transactionState.RemoveExtrinsic(ext)
+//	}
+//
+//	// re-validate transactions in the pool and move them to the queue
+//	txs := s.transactionState.PendingInPool()
+//	for _, tx := range txs {
+//		// get the best block corresponding runtime
+//		rt, err := s.blockState.GetRuntime(nil)
+//		if err != nil {
+//			logger.Warnf("failed to get runtime to re-validate transactions in pool: %s", err)
+//			continue
+//		}
+//
+//		externalExt, err := s.BuildExternalTransaction(rt, tx.Extrinsic)
+//		if err != nil {
+//			fmt.Println("errrrr")
+//			logger.Errorf("Unable to build transaction \n")
+//		}
+//
+//		txnValidity, err := rt.ValidateTransaction(externalExt)
+//		if err != nil {
+//			s.transactionState.RemoveExtrinsic(tx.Extrinsic)
+//			continue
+//		}
+//
+//		tx = transaction.NewValidTransaction(tx.Extrinsic, txnValidity)
+//
+//		// Err is only thrown if tx is already in pool, in which case it still gets removed
+//		h, _ := s.transactionState.Push(tx)
+//
+//		s.transactionState.RemoveExtrinsicFromPool(tx.Extrinsic)
+//		logger.Tracef("moved transaction %s to queue", h)
+//	}
+//}
 
 // InsertKey inserts keypair into the account keystore
 func (s *Service) InsertKey(kp crypto.Keypair, keystoreType string) error {

@@ -8,6 +8,8 @@ package core
 import (
 	"context"
 	"fmt"
+	"github.com/centrifuge/go-substrate-rpc-client/v4/signature"
+	ctypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -107,10 +109,108 @@ func generateConfig(t *testing.T) (*wasmer.Config, *trie.Trie) {
 	}, genTrie
 }
 
-func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.AccountInfo,
-	rt runtime.Instance, service *Service) []byte {
+// newTestExtrinsic builds a new extrinsic using centrifuge pkg
+func newTestExtrinsic(t *testing.T, rt runtime.Instance, genHash, blockHash common.Hash,
+	nonce uint64, call string, args ...interface{}) string {
 	t.Helper()
-	cfg, genTrie := generateConfig(t)
+
+	rawMeta, err := rt.Metadata()
+	require.NoError(t, err)
+
+	var decoded []byte
+	err = scale.Unmarshal(rawMeta, &decoded)
+	require.NoError(t, err)
+
+	meta := &ctypes.Metadata{}
+	err = ctypes.DecodeFromBytes(decoded, meta)
+	require.NoError(t, err)
+
+	rv, err := rt.Version()
+	require.NoError(t, err)
+
+	c, err := ctypes.NewCall(meta, call, args...)
+	require.NoError(t, err)
+
+	ext := ctypes.NewExtrinsic(c)
+	o := ctypes.SignatureOptions{
+		BlockHash:          ctypes.Hash(blockHash),
+		Era:                ctypes.ExtrinsicEra{IsImmortalEra: false},
+		GenesisHash:        ctypes.Hash(genHash),
+		Nonce:              ctypes.NewUCompactFromUInt(nonce),
+		SpecVersion:        ctypes.U32(rv.SpecVersion()),
+		Tip:                ctypes.NewUCompactFromUInt(0),
+		TransactionVersion: ctypes.U32(rv.TransactionVersion()),
+	}
+
+	// Sign the transaction using Alice's key
+	err = ext.Sign(signature.TestKeyringPairAlice, o)
+	require.NoError(t, err)
+
+	extEnc, err := ctypes.EncodeToHexString(ext)
+	require.NoError(t, err)
+
+	return extEnc
+}
+
+//func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.AccountInfo,
+//	rt runtime.Instance, service *Service) []byte {
+//	t.Helper()
+//	cfg, genTrie := generateConfig(t)
+//
+//	rt, err := wasmer.NewRuntimeFromGenesis(cfg)
+//	require.NoError(t, err)
+//
+//	aliceBalanceKey := balanceKey(t, pubKey)
+//	encBal, err := scale.Marshal(accInfo)
+//	require.NoError(t, err)
+//
+//	rt.(*wasmer.Instance).GetContext().Storage.Set(aliceBalanceKey, encBal)
+//	// this key is System.UpgradedToDualRefCount -> set to true since all accounts have been upgraded to v0.9 format
+//	rt.(*wasmer.Instance).GetContext().Storage.Set(common.UpgradedToDualRefKey, []byte{1})
+//
+//	genesisHeader := &types.Header{
+//		Number:    0,
+//		StateRoot: genTrie.MustHash(),
+//	}
+//
+//	bestBlockHash := service.blockState.BestBlockHash()
+//	fmt.Println("best Block: ", bestBlockHash)
+//	fmt.Println("gen Block: ", genesisHeader.Hash())
+//	// Hash of encrypted centrifuge extrinsic
+//	testCallArguments := []byte{0xab, 0xcd}
+//	extHex := newTestExtrinsic(t, rt, genesisHeader.Hash(), genesisHeader.Hash(),
+//		0, "System.remark", testCallArguments)
+//
+//	extBytes := common.MustHexToBytes(extHex)
+//
+//	//runtime.InitializeRuntimeToTest(t, rt, genesisHeader.Hash())
+//	fmt.Println(common.BytesToHex(extBytes))
+//	return extBytes
+//}
+
+func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.AccountInfo) ([]byte, runtime.Instance) {
+	t.Helper()
+	projectRootPath := filepath.Join(utils.GetProjectRootPathTest(t), "chain/gssmr/genesis.json")
+	gen, err := genesis.NewGenesisFromJSONRaw(projectRootPath)
+	require.NoError(t, err)
+
+	genTrie, err := genesis.NewTrieFromGenesis(gen)
+	require.NoError(t, err)
+
+	genState, err := rtstorage.NewTrieState(genTrie)
+	require.NoError(t, err)
+
+	nodeStorage := runtime.NodeStorage{
+		BaseDB: runtime.NewInMemoryDB(t),
+	}
+	cfg := &wasmer.Config{
+		InstanceConfig: runtime.InstanceConfig{
+			Storage:     genState,
+			LogLvl:      log.Error,
+			NodeStorage: nodeStorage,
+		},
+		Imports: nil,
+	}
 
 	rt, err := wasmer.NewRuntimeFromGenesis(cfg)
 	require.NoError(t, err)
@@ -128,21 +228,17 @@ func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.Acco
 		StateRoot: genTrie.MustHash(),
 	}
 
-	bestBlockHash := service.blockState.BestBlockHash()
-	fmt.Println("best Block: ", bestBlockHash)
-	fmt.Println("gen Block: ", genesisHeader.Hash())
 	// Hash of encrypted centrifuge extrinsic
 	testCallArguments := []byte{0xab, 0xcd}
-	extHex := runtime.NewTestExtrinsic(t, rt, genesisHeader.Hash(), bestBlockHash,
+	extHex := runtime.NewTestExtrinsic(t, rt, genesisHeader.Hash(), genesisHeader.Hash(),
 		0, "System.remark", testCallArguments)
 
 	extBytes := common.MustHexToBytes(extHex)
-	//const txnType = byte(types.TxnExternal)
-	//extBytes = append([]byte{txnType}, extBytes...)
-	//extBytes = append([]byte{txnType}, append(extBytes, genesisHeader.Hash().ToBytes()...)...)
+	const txnType = byte(types.TxnExternal)
+	extBytes = append([]byte{txnType}, extBytes...)
 
-	//runtime.InitializeRuntimeToTest(t, rt, genesisHeader.Hash())
-	return extBytes
+	runtime.InitializeRuntimeToTest(t, rt, genesisHeader.Hash())
+	return extBytes, rt
 }
 
 func TestStartService(t *testing.T) {
@@ -456,7 +552,6 @@ func TestHandleChainReorg_WithReorg_Transactions(t *testing.T) {
 }
 
 func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
-	//t.Skip()
 	accountInfo := types.AccountInfo{
 		Nonce: 0,
 		Data: types.AccountData{
@@ -469,39 +564,25 @@ func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
 	keyring, err := keystore.NewSr25519Keyring()
 	require.NoError(t, err)
 	alicePub := common.MustHexToBytes(keyring.Alice().Public().Hex())
+	encExt, runtimeInstance := generateTestValidRemarkTxns(t, alicePub, accountInfo)
+	cfg := &Config{
+		Runtime: runtimeInstance,
+	}
 
-	config, _ := generateConfig(t)
 	ctrl := gomock.NewController(t)
 	telemetryMock := NewMockClient(ctrl)
 	telemetryMock.EXPECT().SendMessage(gomock.Any()).AnyTimes()
 
 	transactionState := state.NewTransactionState(telemetryMock)
-
-	runtimeInstance, err := wasmer.NewRuntimeFromGenesis(config)
-	require.NoError(t, err)
-	cfg := &Config{
-		Runtime: runtimeInstance,
-	}
-
-	service := NewTestService(t, cfg)
-	service.transactionState = transactionState
-
-	encExt := generateTestValidRemarkTxns(t, alicePub, accountInfo, runtimeInstance, service)
-
 	tx := &transaction.ValidTransaction{
 		Extrinsic: types.Extrinsic(encExt),
 		Validity:  &transaction.Validity{Priority: 1},
 	}
 	_ = transactionState.AddToPool(tx)
 
-	//cfg := &Config{
-	//	Runtime: runtimeInstance,
-	//}
-	//
-	//service := NewTestService(t, cfg)
-	//service.transactionState = transactionState
-	//err = service.HandleSubmittedExtrinsic(encExt)
-	//require.NoError(t, err)
+	service := NewTestService(t, cfg)
+	service.transactionState = transactionState
+
 	// provides is a list of transaction hashes that depend on this tx, see:
 	// https://github.com/paritytech/substrate/blob/5420de3face1349a97eb954ae71c5b0b940c31de/core/sr-primitives/src/transaction_validity.rs#L195
 	provides := common.MustHexToBytes("0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d00000000")
@@ -525,6 +606,80 @@ func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
 	head := transactionState.Pop()
 	require.Nil(t, head)
 }
+
+//
+//func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
+//	//t.Skip()
+//	accountInfo := types.AccountInfo{
+//		Nonce: 0,
+//		Data: types.AccountData{
+//			Free:       scale.MustNewUint128(big.NewInt(1152921504606846976)),
+//			Reserved:   scale.MustNewUint128(big.NewInt(0)),
+//			MiscFrozen: scale.MustNewUint128(big.NewInt(0)),
+//			FreeFrozen: scale.MustNewUint128(big.NewInt(0)),
+//		},
+//	}
+//	keyring, err := keystore.NewSr25519Keyring()
+//	require.NoError(t, err)
+//	alicePub := common.MustHexToBytes(keyring.Alice().Public().Hex())
+//
+//	config, _ := generateConfig(t)
+//	ctrl := gomock.NewController(t)
+//	telemetryMock := NewMockClient(ctrl)
+//	telemetryMock.EXPECT().SendMessage(gomock.Any()).AnyTimes()
+//
+//	transactionState := state.NewTransactionState(telemetryMock)
+//
+//	runtimeInstance, err := wasmer.NewRuntimeFromGenesis(config)
+//	require.NoError(t, err)
+//	cfg := &Config{
+//		Runtime: runtimeInstance,
+//	}
+//
+//	service := NewTestService(t, cfg)
+//	service.transactionState = transactionState
+//
+//	encExt := generateTestValidRemarkTxns(t, alicePub, accountInfo, runtimeInstance, service)
+//	fmt.Println("encExt")
+//	fmt.Println(encExt)
+//	tx := &transaction.ValidTransaction{
+//		Extrinsic: types.Extrinsic(encExt),
+//		Validity:  &transaction.Validity{Priority: 1},
+//	}
+//	_ = transactionState.AddToPool(tx)
+//
+//	//cfg := &Config{
+//	//	Runtime: runtimeInstance,
+//	//}
+//	//
+//	//service := NewTestService(t, cfg)
+//	//service.transactionState = transactionState
+//	//err = service.HandleSubmittedExtrinsic(encExt)
+//	//require.NoError(t, err)
+//	// provides is a list of transaction hashes that depend on this tx, see:
+//	// https://github.com/paritytech/substrate/blob/5420de3face1349a97eb954ae71c5b0b940c31de/core/sr-primitives/src/transaction_validity.rs#L195
+//	provides := common.MustHexToBytes("0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d00000000")
+//	txnValidity := &transaction.Validity{
+//		Priority:  39325240425794630,
+//		Provides:  [][]byte{provides},
+//		Longevity: 18446744073709551614,
+//		Propagate: true,
+//	}
+//	//	txnValidity := &transaction.Validity{}
+//
+//	expectedTx := transaction.NewValidTransaction(tx.Extrinsic, txnValidity)
+//
+//	service.maintainTransactionPool(&types.Block{
+//		Body: *types.NewBody([]types.Extrinsic{}),
+//	})
+//
+//	resultTx := transactionState.Pop()
+//	require.Equal(t, expectedTx, resultTx)
+//
+//	transactionState.RemoveExtrinsic(tx.Extrinsic)
+//	head := transactionState.Pop()
+//	require.Nil(t, head)
+//}
 
 //func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
 //	//t.Skip()
