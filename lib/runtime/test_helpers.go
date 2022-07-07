@@ -228,6 +228,9 @@ func NewTestExtrinsic(t *testing.T, rt Instance, genHash, blockHash common.Hash,
 		TransactionVersion: ctypes.U32(rv.TransactionVersion()),
 	}
 
+	fmt.Println("o")
+	fmt.Println(o)
+
 	// Sign the transaction using Alice's key
 	err = ext.Sign(signature.TestKeyringPairAlice, o)
 	require.NoError(t, err)
