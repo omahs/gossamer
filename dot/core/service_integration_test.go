@@ -232,6 +232,8 @@ func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.Acco
 	testCallArguments := []byte{0xab, 0xcd}
 	extHex := runtime.NewTestExtrinsic(t, rt, genesisHeader.Hash(), genesisHeader.Hash(),
 		0, "System.remark", testCallArguments)
+	fmt.Println("extHex")
+	fmt.Println(extHex)
 
 	extBytes := common.MustHexToBytes(extHex)
 	const txnType = byte(types.TxnExternal)

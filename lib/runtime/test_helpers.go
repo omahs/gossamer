@@ -238,6 +238,8 @@ func NewTestExtrinsic(t *testing.T, rt Instance, genHash, blockHash common.Hash,
 	extEnc, err := ctypes.EncodeToHexString(ext)
 	require.NoError(t, err)
 
+	//extEnc Keeps changing for some reason??
+
 	return extEnc
 }
 
