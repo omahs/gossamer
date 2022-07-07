@@ -218,6 +218,7 @@ func NewTestExtrinsic(t *testing.T, rt Instance, genHash, blockHash common.Hash,
 	require.NoError(t, err)
 
 	ext := ctypes.NewExtrinsic(c)
+	// Extrinsic is same here as in dev
 	o := ctypes.SignatureOptions{
 		BlockHash:          ctypes.Hash(blockHash),
 		Era:                ctypes.ExtrinsicEra{IsImmortalEra: false},
@@ -228,12 +229,13 @@ func NewTestExtrinsic(t *testing.T, rt Instance, genHash, blockHash common.Hash,
 		TransactionVersion: ctypes.U32(rv.TransactionVersion()),
 	}
 
-	fmt.Println("o")
-	fmt.Println(o)
+	// o is the same here as in dev
 
 	// Sign the transaction using Alice's key
 	err = ext.Sign(signature.TestKeyringPairAlice, o)
 	require.NoError(t, err)
+
+	// IsSr25519:true AsSr25519:[<sig is different>]
 
 	extEnc, err := ctypes.EncodeToHexString(ext)
 	require.NoError(t, err)

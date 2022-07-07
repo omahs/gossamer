@@ -232,14 +232,12 @@ func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.Acco
 	testCallArguments := []byte{0xab, 0xcd}
 	extHex := runtime.NewTestExtrinsic(t, rt, genesisHeader.Hash(), genesisHeader.Hash(),
 		0, "System.remark", testCallArguments)
-	fmt.Println("extHex")
-	fmt.Println(extHex)
 
 	extBytes := common.MustHexToBytes(extHex)
 	const txnType = byte(types.TxnExternal)
 	extBytes = append([]byte{txnType}, extBytes...)
 
-	fmt.Println("extBytes")
+	fmt.Println("extBytes when formed")
 	fmt.Println(extBytes)
 
 	runtime.InitializeRuntimeToTest(t, rt, genesisHeader.Hash())
@@ -583,6 +581,8 @@ func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
 		Extrinsic: types.Extrinsic(encExt),
 		Validity:  &transaction.Validity{Priority: 1},
 	}
+	fmt.Println("txn being added")
+	fmt.Printf("%+v\n", tx)
 	_ = transactionState.AddToPool(tx)
 
 	service := NewTestService(t, cfg)

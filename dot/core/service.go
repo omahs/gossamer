@@ -414,8 +414,12 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 	// re-validate transactions in the pool and move them to the queue
 	txs := s.transactionState.PendingInPool()
 	for _, tx := range txs {
-		fmt.Println("in loop")
-		fmt.Println(tx)
+		fmt.Println("txn from pool")
+		fmt.Printf("%+v\n", tx)
+
+		// Okay we know that the transaction added to pool is what is retrieved
+		// So i think, either the signature this is messing up the bytes (kinda dont think so) or something is wrong below
+
 		// get the best block corresponding runtime
 		ts, err := s.storageState.TrieState(nil)
 		if err != nil {
@@ -431,8 +435,6 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 
 		rt.SetContextStorage(ts)
 
-		fmt.Println("tx.Extrinsic")
-		fmt.Println(tx.Extrinsic)
 		//externalExt, err := s.BuildExternalTransaction(rt, tx.Extrinsic)
 		//if err != nil {
 		//	fmt.Println("errrrr")
