@@ -431,11 +431,16 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 
 		rt.SetContextStorage(ts)
 
+		fmt.Println("tx.Extrinsic")
+		fmt.Println(tx.Extrinsic)
 		//externalExt, err := s.BuildExternalTransaction(rt, tx.Extrinsic)
 		//if err != nil {
 		//	fmt.Println("errrrr")
 		//	logger.Errorf("Unable to build transaction \n")
 		//}
+		//
+		//fmt.Println("externalExt")
+		//fmt.Println(externalExt)
 
 		txnValidity, err := rt.ValidateTransaction(tx.Extrinsic)
 		if err != nil {

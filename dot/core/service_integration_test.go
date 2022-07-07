@@ -237,6 +237,9 @@ func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.Acco
 	const txnType = byte(types.TxnExternal)
 	extBytes = append([]byte{txnType}, extBytes...)
 
+	fmt.Println("extBytes")
+	fmt.Println(extBytes)
+
 	runtime.InitializeRuntimeToTest(t, rt, genesisHeader.Hash())
 	return extBytes, rt
 }
