@@ -414,19 +414,16 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 	// re-validate transactions in the pool and move them to the queue
 	txs := s.transactionState.PendingInPool()
 	for _, tx := range txs {
-		fmt.Println("txn from pool")
-		fmt.Printf("%+v\n", tx)
+		// Getting the trieState and using it to set the runtime context is breaking things
+		// Why? not sure
 
-		// Okay we know that the transaction added to pool is what is retrieved
-		// So i think, either the signature this is messing up the bytes (kinda dont think so) or something is wrong below
-
-		// get the best block corresponding runtime
 		ts, err := s.storageState.TrieState(nil)
 		if err != nil {
 			logger.Critical("failed to get trie state")
 			continue
 		}
 
+		// get the best block corresponding runtime
 		rt, err := s.blockState.GetRuntime(nil)
 		if err != nil {
 			logger.Warnf("failed to get runtime to re-validate transactions in pool: %s", err)
@@ -434,6 +431,8 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 		}
 
 		rt.SetContextStorage(ts)
+
+		// Commented out to reduce diff with dev
 
 		//externalExt, err := s.BuildExternalTransaction(rt, tx.Extrinsic)
 		//if err != nil {
@@ -461,46 +460,6 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 		logger.Tracef("moved transaction %s to queue", h)
 	}
 }
-
-//
-//// Dev version
-//func (s *Service) maintainTransactionPool(block *types.Block) {
-//	// remove extrinsics included in a block
-//	for _, ext := range block.Body {
-//		s.transactionState.RemoveExtrinsic(ext)
-//	}
-//
-//	// re-validate transactions in the pool and move them to the queue
-//	txs := s.transactionState.PendingInPool()
-//	for _, tx := range txs {
-//		// get the best block corresponding runtime
-//		rt, err := s.blockState.GetRuntime(nil)
-//		if err != nil {
-//			logger.Warnf("failed to get runtime to re-validate transactions in pool: %s", err)
-//			continue
-//		}
-//
-//		externalExt, err := s.BuildExternalTransaction(rt, tx.Extrinsic)
-//		if err != nil {
-//			fmt.Println("errrrr")
-//			logger.Errorf("Unable to build transaction \n")
-//		}
-//
-//		txnValidity, err := rt.ValidateTransaction(externalExt)
-//		if err != nil {
-//			s.transactionState.RemoveExtrinsic(tx.Extrinsic)
-//			continue
-//		}
-//
-//		tx = transaction.NewValidTransaction(tx.Extrinsic, txnValidity)
-//
-//		// Err is only thrown if tx is already in pool, in which case it still gets removed
-//		h, _ := s.transactionState.Push(tx)
-//
-//		s.transactionState.RemoveExtrinsicFromPool(tx.Extrinsic)
-//		logger.Tracef("moved transaction %s to queue", h)
-//	}
-//}
 
 // InsertKey inserts keypair into the account keystore
 func (s *Service) InsertKey(kp crypto.Keypair, keystoreType string) error {

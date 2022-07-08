@@ -20,8 +20,6 @@ func (in *Instance) ValidateTransaction(e types.Extrinsic) (*transaction.Validit
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("ret")
-	fmt.Println(ret)
 	return decodeValidity(ret)
 }
 
