@@ -417,11 +417,11 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 		// Getting the trieState and using it to set the runtime context is breaking things
 		// Why? not sure
 
-		ts, err := s.storageState.TrieState(nil)
-		if err != nil {
-			logger.Critical("failed to get trie state")
-			continue
-		}
+		//ts, err := s.storageState.TrieState(nil)
+		//if err != nil {
+		//	logger.Critical("failed to get trie state")
+		//	continue
+		//}
 
 		// get the best block corresponding runtime
 		rt, err := s.blockState.GetRuntime(nil)
@@ -430,7 +430,7 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 			continue
 		}
 
-		rt.SetContextStorage(ts)
+		//rt.SetContextStorage(ts)
 
 		// Commented out to reduce diff with dev
 
@@ -552,18 +552,16 @@ func (s *Service) HandleSubmittedExtrinsic(ext types.Extrinsic) error {
 	}
 
 	rt.SetContextStorage(ts)
-	fmt.Println("got here")
 	// the transaction source is External
 	externalExt, err := s.BuildExternalTransaction(rt, ext)
 	if err != nil {
 		return err
 	}
-	fmt.Println("Build txn")
+
 	txv, err := rt.ValidateTransaction(externalExt)
 	if err != nil {
 		return err
 	}
-	fmt.Println("validated")
 
 	// add transaction to pool
 	vtx := transaction.NewValidTransaction(ext, txv)

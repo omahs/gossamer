@@ -503,9 +503,57 @@ func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
 	require.Nil(t, head)
 }
 
+//func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
+//	//TODO fix this test
+//	accountInfo := types.AccountInfo{
+//		Nonce: 0,
+//		Data: types.AccountData{
+//			Free:       scale.MustNewUint128(big.NewInt(1152921504606846976)),
+//			Reserved:   scale.MustNewUint128(big.NewInt(0)),
+//			MiscFrozen: scale.MustNewUint128(big.NewInt(0)),
+//			FreeFrozen: scale.MustNewUint128(big.NewInt(0)),
+//		},
+//	}
+//	keyring, err := keystore.NewSr25519Keyring()
+//	require.NoError(t, err)
+//	alicePub := common.MustHexToBytes(keyring.Alice().Public().Hex())
+//	extrinsicBytes, _ := generateTestValidRemarkTxns(t, alicePub, accountInfo)
+//
+//	ctrl := gomock.NewController(t)
+//	telemetryMock := NewMockClient(ctrl)
+//	telemetryMock.EXPECT().SendMessage(gomock.Any()).AnyTimes()
+//
+//	ts := state.NewTransactionState(telemetryMock)
+//
+//	// Maybe replace validity
+//	tx := &transaction.ValidTransaction{
+//		Extrinsic: types.Extrinsic(extrinsicBytes),
+//		Validity:  &transaction.Validity{Priority: 1},
+//	}
+//
+//	ts.AddToPool(tx)
+//
+//	s := &Service{
+//		transactionState: ts,
+//	}
+//
+//	s.maintainTransactionPool(&types.Block{
+//		Body: types.Body([]types.Extrinsic{extrinsicBytes}),
+//	})
+//
+//	res := []*transaction.ValidTransaction{}
+//	for {
+//		tx := ts.Pop()
+//		if tx == nil {
+//			break
+//		}
+//		res = append(res, tx)
+//	}
+//	// Extrinsic is removed. so empty res
+//	require.Empty(t, res)
+//}
+
 func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
-	//TODO fix this test
-	t.Skip()
 	accountInfo := types.AccountInfo{
 		Nonce: 0,
 		Data: types.AccountData{
@@ -518,14 +566,16 @@ func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
 	keyring, err := keystore.NewSr25519Keyring()
 	require.NoError(t, err)
 	alicePub := common.MustHexToBytes(keyring.Alice().Public().Hex())
-	extrinsicBytes, _ := generateTestValidRemarkTxns(t, alicePub, accountInfo)
+	extrinsicBytes, runtimeInstance := generateTestValidRemarkTxns(t, alicePub, accountInfo)
+	cfg := &Config{
+		Runtime: runtimeInstance,
+	}
 
 	ctrl := gomock.NewController(t)
 	telemetryMock := NewMockClient(ctrl)
 	telemetryMock.EXPECT().SendMessage(gomock.Any()).AnyTimes()
 
 	ts := state.NewTransactionState(telemetryMock)
-
 	// Maybe replace validity
 	tx := &transaction.ValidTransaction{
 		Extrinsic: types.Extrinsic(extrinsicBytes),
@@ -534,11 +584,10 @@ func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
 
 	ts.AddToPool(tx)
 
-	s := &Service{
-		transactionState: ts,
-	}
+	service := NewTestService(t, cfg)
+	service.transactionState = ts
 
-	s.maintainTransactionPool(&types.Block{
+	service.maintainTransactionPool(&types.Block{
 		Body: types.Body([]types.Extrinsic{extrinsicBytes}),
 	})
 
