@@ -414,15 +414,6 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 	// re-validate transactions in the pool and move them to the queue
 	txs := s.transactionState.PendingInPool()
 	for _, tx := range txs {
-		// Getting the trieState and using it to set the runtime context is breaking things
-		// Why? not sure
-
-		//ts, err := s.storageState.TrieState(nil)
-		//if err != nil {
-		//	logger.Critical("failed to get trie state")
-		//	continue
-		//}
-
 		// get the best block corresponding runtime
 		rt, err := s.blockState.GetRuntime(nil)
 		if err != nil {
@@ -430,20 +421,12 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 			continue
 		}
 
-		//rt.SetContextStorage(ts)
+		externalExt, err := s.BuildExternalTransaction(rt, tx.Extrinsic)
+		if err != nil {
+			logger.Errorf("Unable to build transaction \n")
+		}
 
-		// Commented out to reduce diff with dev
-
-		//externalExt, err := s.BuildExternalTransaction(rt, tx.Extrinsic)
-		//if err != nil {
-		//	fmt.Println("errrrr")
-		//	logger.Errorf("Unable to build transaction \n")
-		//}
-		//
-		//fmt.Println("externalExt")
-		//fmt.Println(externalExt)
-
-		txnValidity, err := rt.ValidateTransaction(tx.Extrinsic)
+		txnValidity, err := rt.ValidateTransaction(externalExt)
 		if err != nil {
 			fmt.Println("unable to validate tx")
 			fmt.Println(err)

@@ -128,10 +128,6 @@ func generateTestValidRemarkTxns(t *testing.T, pubKey []byte, accInfo types.Acco
 		0, "System.remark", testCallArguments)
 
 	extBytes := common.MustHexToBytes(extHex)
-	// TODO after fix mempool remove below lines and use new function to make txns
-	const txnType = byte(types.TxnExternal)
-	extBytes = append([]byte{txnType}, extBytes...)
-
 	runtime.InitializeRuntimeToTest(t, rt, genesisHeader.Hash())
 	return extBytes, rt
 }
