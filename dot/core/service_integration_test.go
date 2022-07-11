@@ -205,7 +205,8 @@ func generateTestValidRemarkTxns(t *testing.T, genesisFilePath string, pubKey []
 		0, "System.remark", testCallArguments)
 
 	extBytes := common.MustHexToBytes(extHex)
-	InitializeRuntimeToTestLatestTxnQueue(t, rt, genesisHeader.Hash())
+	//InitializeRuntimeToTestLatestTxnQueue(t, rt, genesisHeader.Hash())
+	runtime.InitializeRuntimeToTest(t, rt, genesisHeader.Hash())
 	return extBytes, rt
 }
 
@@ -577,63 +578,64 @@ func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
 	require.Nil(t, head)
 }
 
-func TestMaintainTransactionPoolLatestTxnQueue_EmptyBlock(t *testing.T) {
-	accountInfo := types.AccountInfo{
-		Nonce: 0,
-		Data: types.AccountData{
-			Free:       scale.MustNewUint128(big.NewInt(1152921504606846976)),
-			Reserved:   scale.MustNewUint128(big.NewInt(0)),
-			MiscFrozen: scale.MustNewUint128(big.NewInt(0)),
-			FreeFrozen: scale.MustNewUint128(big.NewInt(0)),
-		},
-	}
-	keyring, err := keystore.NewSr25519Keyring()
-	require.NoError(t, err)
-	alicePub := common.MustHexToBytes(keyring.Alice().Public().Hex())
-	genesisFilePath := "chain/gssmrLatestTxnQueue/genesis.json"
-	encExt, runtimeInstance := generateTestValidRemarkTxns(t, genesisFilePath, alicePub, accountInfo)
-	cfg := &Config{
-		Runtime: runtimeInstance,
-	}
-
-	ctrl := gomock.NewController(t)
-	telemetryMock := NewMockClient(ctrl)
-	telemetryMock.EXPECT().SendMessage(gomock.Any()).AnyTimes()
-
-	transactionState := state.NewTransactionState(telemetryMock)
-	tx := &transaction.ValidTransaction{
-		Extrinsic: types.Extrinsic(encExt),
-		Validity:  &transaction.Validity{Priority: 1},
-	}
-
-	_ = transactionState.AddToPool(tx)
-
-	service := NewTestService(t, cfg)
-	service.transactionState = transactionState
-
-	// provides is a list of transaction hashes that depend on this tx, see:
-	// https://github.com/paritytech/substrate/blob/5420de3face1349a97eb954ae71c5b0b940c31de/core/sr-primitives/src/transaction_validity.rs#L195
-	provides := common.MustHexToBytes("0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d00000000")
-	txnValidity := &transaction.Validity{
-		Priority:  39325240425794630,
-		Provides:  [][]byte{provides},
-		Longevity: 18446744073709551614,
-		Propagate: true,
-	}
-
-	expectedTx := transaction.NewValidTransaction(tx.Extrinsic, txnValidity)
-
-	service.maintainTransactionPool(&types.Block{
-		Body: *types.NewBody([]types.Extrinsic{}),
-	})
-
-	resultTx := transactionState.Pop()
-	require.Equal(t, expectedTx, resultTx)
-
-	transactionState.RemoveExtrinsic(tx.Extrinsic)
-	head := transactionState.Pop()
-	require.Nil(t, head)
-}
+//
+//func TestMaintainTransactionPoolLatestTxnQueue_EmptyBlock(t *testing.T) {
+//	accountInfo := types.AccountInfo{
+//		Nonce: 0,
+//		Data: types.AccountData{
+//			Free:       scale.MustNewUint128(big.NewInt(1152921504606846976)),
+//			Reserved:   scale.MustNewUint128(big.NewInt(0)),
+//			MiscFrozen: scale.MustNewUint128(big.NewInt(0)),
+//			FreeFrozen: scale.MustNewUint128(big.NewInt(0)),
+//		},
+//	}
+//	keyring, err := keystore.NewSr25519Keyring()
+//	require.NoError(t, err)
+//	alicePub := common.MustHexToBytes(keyring.Alice().Public().Hex())
+//	genesisFilePath := "chain/gssmrLatestTxnQueue/genesis.json"
+//	encExt, runtimeInstance := generateTestValidRemarkTxns(t, genesisFilePath, alicePub, accountInfo)
+//	cfg := &Config{
+//		Runtime: runtimeInstance,
+//	}
+//
+//	ctrl := gomock.NewController(t)
+//	telemetryMock := NewMockClient(ctrl)
+//	telemetryMock.EXPECT().SendMessage(gomock.Any()).AnyTimes()
+//
+//	transactionState := state.NewTransactionState(telemetryMock)
+//	tx := &transaction.ValidTransaction{
+//		Extrinsic: types.Extrinsic(encExt),
+//		Validity:  &transaction.Validity{Priority: 1},
+//	}
+//
+//	_ = transactionState.AddToPool(tx)
+//
+//	service := NewTestService(t, cfg)
+//	service.transactionState = transactionState
+//
+//	// provides is a list of transaction hashes that depend on this tx, see:
+//	// https://github.com/paritytech/substrate/blob/5420de3face1349a97eb954ae71c5b0b940c31de/core/sr-primitives/src/transaction_validity.rs#L195
+//	provides := common.MustHexToBytes("0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d00000000")
+//	txnValidity := &transaction.Validity{
+//		Priority:  39325240425794630,
+//		Provides:  [][]byte{provides},
+//		Longevity: 18446744073709551614,
+//		Propagate: true,
+//	}
+//
+//	expectedTx := transaction.NewValidTransaction(tx.Extrinsic, txnValidity)
+//
+//	service.maintainTransactionPool(&types.Block{
+//		Body: *types.NewBody([]types.Extrinsic{}),
+//	})
+//
+//	resultTx := transactionState.Pop()
+//	require.Equal(t, expectedTx, resultTx)
+//
+//	transactionState.RemoveExtrinsic(tx.Extrinsic)
+//	head := transactionState.Pop()
+//	require.Nil(t, head)
+//}
 
 func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
 	accountInfo := types.AccountInfo{
