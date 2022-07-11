@@ -506,10 +506,6 @@ func Test_Service_maintainTransactionPool(t *testing.T) {
 		testHeader := types.NewEmptyHeader()
 		block := types.NewBlock(*testHeader, *types.NewBody([]types.Extrinsic{[]byte{21}}))
 		block.Header.Number = 21
-		emptyTrie := trie.NewEmptyTrie()
-		ts, err := rtstorage.NewTrieState(emptyTrie)
-		require.NoError(t, err)
-
 		service := &Service{}
 
 		validity := &transaction.Validity{
@@ -530,7 +526,6 @@ func Test_Service_maintainTransactionPool(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		runtimeMock := new(mocksruntime.Instance)
 		runtimeMock.On("ValidateTransaction", externalExt).Return(nil, errTestDummyError)
-		runtimeMock.On("SetContextStorage", ts)
 		runtimeMock.On("Version").Return(runtimeVersionData, nil)
 		mockTxnState := NewMockTransactionState(ctrl)
 		mockTxnState.EXPECT().RemoveExtrinsic(types.Extrinsic{21}).Times(2)
@@ -541,7 +536,6 @@ func Test_Service_maintainTransactionPool(t *testing.T) {
 		mockStorageState := NewMockStorageState(ctrl)
 		mockStorageState.EXPECT().Lock()
 		mockStorageState.EXPECT().Unlock()
-		mockStorageState.EXPECT().TrieState(nil).Return(ts, nil)
 		service = &Service{
 			transactionState: mockTxnState,
 			blockState:       mockBlockState,
@@ -555,10 +549,6 @@ func Test_Service_maintainTransactionPool(t *testing.T) {
 		testHeader := types.NewEmptyHeader()
 		block := types.NewBlock(*testHeader, *types.NewBody([]types.Extrinsic{[]byte{21}}))
 		block.Header.Number = 21
-		emptyTrie := trie.NewEmptyTrie()
-		ts, err := rtstorage.NewTrieState(emptyTrie)
-		require.NoError(t, err)
-
 		validity := &transaction.Validity{
 			Priority: 0x3e8,
 			Requires: [][]byte{{0xb5, 0x47, 0xb1, 0x90, 0x37, 0x10, 0x7e, 0x1f, 0x79, 0x4c,
@@ -579,7 +569,6 @@ func Test_Service_maintainTransactionPool(t *testing.T) {
 		runtimeMock := new(mocksruntime.Instance)
 		runtimeMock.On("ValidateTransaction", externalExt).
 			Return(&transaction.Validity{Propagate: true}, nil)
-		runtimeMock.On("SetContextStorage", ts)
 		runtimeMock.On("Version").Return(runtimeVersionData, nil)
 		mockTxnState := NewMockTransactionState(ctrl)
 		mockTxnState.EXPECT().RemoveExtrinsic(types.Extrinsic{21})
@@ -592,7 +581,6 @@ func Test_Service_maintainTransactionPool(t *testing.T) {
 		mockStorageState := NewMockStorageState(ctrl)
 		mockStorageState.EXPECT().Lock()
 		mockStorageState.EXPECT().Unlock()
-		mockStorageState.EXPECT().TrieState(nil).Return(ts, nil)
 		service := &Service{
 			transactionState: mockTxnState,
 			blockState:       mockBlockStateOk,
@@ -681,20 +669,20 @@ func Test_Service_handleBlocksAsync(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		runtimeMock := new(mocksruntime.Instance)
 		runtimeMock.On("ValidateTransaction", externalExt).Return(nil, errTestDummyError)
+		runtimeMock.On("Version").Return(runtimeVersionData, nil)
 		runtimeMock.On("SetContextStorage", ts)
 		mockBlockState := NewMockBlockState(ctrl)
-		mockBlockState.EXPECT().BestBlockHash().Return(common.Hash{}).Times(2)
+		mockBlockState.EXPECT().BestBlockHash().Return(common.Hash{}).Times(3)
 		mockBlockState.EXPECT().HighestCommonAncestor(common.Hash{}, block.Header.Hash()).
 			Return(common.Hash{}, errTestDummyError)
-		//mockBlockState.EXPECT().GetRuntime(nil).Return(runtimeMock, nil)
+		mockBlockState.EXPECT().GetRuntime(nil).Return(runtimeMock, nil)
 		mockTxnStateErr := NewMockTransactionState(ctrl)
-		mockTxnStateErr.EXPECT().RemoveExtrinsic(types.Extrinsic{21}).Times(1)
+		mockTxnStateErr.EXPECT().RemoveExtrinsic(types.Extrinsic{21}).Times(2)
 		mockTxnStateErr.EXPECT().PendingInPool().Return([]*transaction.ValidTransaction{vt})
 		blockAddChan := make(chan *types.Block)
 		mockStorageState := NewMockStorageState(ctrl)
 		mockStorageState.EXPECT().Lock()
 		mockStorageState.EXPECT().Unlock()
-		mockStorageState.EXPECT().TrieState(nil).Return(nil, errTestDummyError)
 		go func() {
 			blockAddChan <- &block
 			close(blockAddChan)
