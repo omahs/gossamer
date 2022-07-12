@@ -533,7 +533,6 @@ func (s *Service) HandleSubmittedExtrinsic(ext types.Extrinsic) error {
 	}
 
 	rt.SetContextStorage(ts)
-	// the transaction source is External
 	externalExt, err := s.BuildExternalTransaction(rt, ext)
 	if err != nil {
 		return err

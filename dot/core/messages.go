@@ -11,16 +11,14 @@ import (
 	"github.com/ChainSafe/gossamer/dot/peerset"
 	"github.com/ChainSafe/gossamer/dot/types"
 	"github.com/ChainSafe/gossamer/lib/runtime"
-	"github.com/ChainSafe/gossamer/lib/runtime/storage"
 	"github.com/ChainSafe/gossamer/lib/transaction"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
-func (s *Service) validateTransaction(peerID peer.ID, head *types.Header, rt runtime.Instance, ts *storage.TrieState,
+func (s *Service) validateTransaction(peerID peer.ID, rt runtime.Instance,
 	tx types.Extrinsic) (validity *transaction.Validity, valid bool, err error) {
 
-	// validate each transaction
 	externalExt, err := s.BuildExternalTransaction(rt, tx)
 	if err != nil {
 		logger.Errorf("Unable to build transaction \n")
@@ -85,7 +83,7 @@ func (s *Service) HandleTransactionMessage(peerID peer.ID, msg *network.Transact
 
 	allTxsAreValid := true
 	for _, tx := range txs {
-		validity, isValidTxn, err := s.validateTransaction(peerID, head, rt, ts, tx)
+		validity, isValidTxn, err := s.validateTransaction(peerID, rt, tx)
 		if err != nil {
 			return false, fmt.Errorf("failed validating transaction for peerID %s: %w", peerID, err)
 		}
