@@ -27,8 +27,8 @@ func NewMockStorageAPI() *modulesmocks.StorageAPI {
 	return m
 }
 
-// NewMockBlockAPI creates and return an rpc BlockAPI interface mock
-func NewMockBlockAPI() *modulesmocks.BlockAPI {
+// NewMockeryBlockAPI creates and return an rpc BlockAPI interface mock
+func NewMockeryBlockAPI() *modulesmocks.BlockAPI {
 	m := new(modulesmocks.BlockAPI)
 	m.On("GetHeader", mock.AnythingOfType("common.Hash")).Return(nil, nil)
 	m.On("BestBlockHash").Return(common.Hash{})
@@ -80,5 +80,6 @@ func NewMockVersion() *runtimemocks.Version {
 	m.On("ImplVersion").Return(uint32(0))
 	m.On("TransactionVersion").Return(uint32(0))
 	m.On("APIItems").Return(nil)
+	m.On("TaggedTransactionQueueVersion", mock.AnythingOfType("runtime.Version")).Return(uint32(0))
 	return m
 }

@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 //go:build integration
-// +build integration
 
 package modules
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -54,14 +54,9 @@ func useInstanceFromGenesis(t *testing.T, rtStorage *storage.TrieState) (instanc
 }
 
 func useInstanceFromRuntimeV0910(t *testing.T, rtStorage *storage.TrieState) (instance runtime.Instance) {
-	testRuntimeFilePath, testRuntimeURL := runtime.GetRuntimeVars(runtime.POLKADOT_RUNTIME_v0910)
-	err := runtime.GetRuntimeBlob(testRuntimeFilePath, testRuntimeURL)
+	testRuntimeFilePath, err := runtime.GetRuntime(context.Background(), runtime.POLKADOT_RUNTIME_v0910)
 	require.NoError(t, err)
-
 	bytes, err := os.ReadFile(testRuntimeFilePath)
-	require.NoError(t, err)
-
-	err = runtime.RemoveFiles([]string{testRuntimeFilePath})
 	require.NoError(t, err)
 
 	rtStorage.Set(common.CodeKey, bytes)
@@ -81,20 +76,6 @@ func useInstanceFromRuntimeV0910(t *testing.T, rtStorage *storage.TrieState) (in
 	require.NoError(t, err)
 
 	return runtimeInstance
-}
-
-func TestMain(m *testing.M) {
-	wasmFilePaths, err := runtime.GenerateRuntimeWasmFile()
-	if err != nil {
-		log.Errorf("failed to generate runtime wasm file: %s", err)
-		os.Exit(1)
-	}
-
-	// Start all tests
-	code := m.Run()
-
-	runtime.RemoveFiles(wasmFilePaths)
-	os.Exit(code)
 }
 
 func TestAuthorModule_Pending_Integration(t *testing.T) {
@@ -199,7 +180,7 @@ func TestAuthorModule_SubmitExtrinsic_invalid(t *testing.T) {
 
 	res := new(ExtrinsicHashResponse)
 	err := auth.SubmitExtrinsic(nil, &Extrinsic{extHex}, res)
-	require.EqualError(t, err, runtime.ErrInvalidTransaction.Message)
+	require.EqualError(t, err, "transaction validity error: ancient birth block")
 
 	txOnPool := integrationTestController.stateSrv.Transaction.PendingInPool()
 	require.Len(t, txOnPool, 0)
@@ -274,6 +255,7 @@ func TestAuthorModule_SubmitExtrinsic_AlreadyInPool(t *testing.T) {
 }
 
 func TestAuthorModule_InsertKey_Integration(t *testing.T) {
+	t.Parallel()
 	integrationTestController := setupStateAndRuntime(t, t.TempDir(), useInstanceFromGenesis)
 	auth := newAuthorModule(t, integrationTestController)
 
@@ -355,6 +337,7 @@ func TestAuthorModule_InsertKey_Integration(t *testing.T) {
 }
 
 func TestAuthorModule_HasKey_Integration(t *testing.T) {
+	t.Parallel()
 	integrationTestController := setupStateAndRuntime(t, t.TempDir(), useInstanceFromGenesis)
 
 	ks := keystore.NewGlobalKeystore()
@@ -422,6 +405,7 @@ func TestAuthorModule_HasKey_Integration(t *testing.T) {
 }
 
 func TestAuthorModule_HasSessionKeys_Integration(t *testing.T) {
+	t.Parallel()
 	integrationTestController := setupStateAndRuntime(t, t.TempDir(), useInstanceFromGenesis)
 	auth := newAuthorModule(t, integrationTestController)
 
@@ -536,15 +520,10 @@ func TestAuthorModule_SubmitExtrinsic_WithVersion_V0910(t *testing.T) {
 	extHex := runtime.NewTestExtrinsic(t,
 		integrationTestController.runtime, genesisHash, genesisHash, 1, "System.remark", []byte{0xab, 0xcd})
 
-	// to extrinsic works with a runtime version 0910 we need to
-	// append the block hash bytes at the end of the extrinsics
-	hashBytes := genesisHash.ToBytes()
-	extBytes := append(common.MustHexToBytes(extHex), hashBytes...)
-
-	extHex = common.BytesToHex(extBytes)
-
 	net2test := coremocks.NewMockNetwork(ctrl)
-	net2test.EXPECT().GossipMessage(&network.TransactionMessage{Extrinsics: []types.Extrinsic{extBytes}})
+	net2test.EXPECT().GossipMessage(&network.TransactionMessage{
+		Extrinsics: []types.Extrinsic{common.MustHexToBytes(extHex)},
+	})
 	integrationTestController.network = net2test
 
 	// setup auth module
@@ -554,7 +533,7 @@ func TestAuthorModule_SubmitExtrinsic_WithVersion_V0910(t *testing.T) {
 	err := auth.SubmitExtrinsic(nil, &Extrinsic{extHex}, res)
 	require.NoError(t, err)
 
-	expectedExtrinsic := types.NewExtrinsic(extBytes)
+	expectedExtrinsic := types.NewExtrinsic(common.MustHexToBytes(extHex))
 	expected := &transaction.ValidTransaction{
 		Extrinsic: expectedExtrinsic,
 		Validity: &transaction.Validity{
@@ -722,13 +701,11 @@ func setupStateAndPopulateTrieState(t *testing.T, basepath string,
 }
 
 //go:generate mockgen -destination=mock_code_substituted_state_test.go -package modules github.com/ChainSafe/gossamer/dot/core CodeSubstitutedState
-//go:generate mockgen -destination=mock_digest_handler_test.go -package modules github.com/ChainSafe/gossamer/dot/core DigestHandler
 
 func newAuthorModule(t *testing.T, integrationTestController *integrationTestController) *AuthorModule {
 	t.Helper()
 
 	codeSubstitutedStateMock := NewMockCodeSubstitutedState(nil)
-	digestHandlerMock := NewMockDigestHandler(nil)
 
 	cfg := &core.Config{
 		TransactionState:     integrationTestController.stateSrv.Transaction,
@@ -737,7 +714,6 @@ func newAuthorModule(t *testing.T, integrationTestController *integrationTestCon
 		Network:              integrationTestController.network,
 		Keystore:             integrationTestController.keystore,
 		CodeSubstitutedState: codeSubstitutedStateMock,
-		DigestHandler:        digestHandlerMock,
 	}
 
 	core2test, err := core.NewService(cfg)

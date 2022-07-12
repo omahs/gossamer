@@ -4,77 +4,91 @@
 package stress
 
 import (
-	"os"
+	"context"
 	"testing"
 	"time"
 
+	libutils "github.com/ChainSafe/gossamer/lib/utils"
 	"github.com/ChainSafe/gossamer/tests/utils"
-
+	"github.com/ChainSafe/gossamer/tests/utils/config"
+	"github.com/ChainSafe/gossamer/tests/utils/node"
+	"github.com/ChainSafe/gossamer/tests/utils/retry"
 	"github.com/stretchr/testify/require"
 )
 
 func TestStress_Grandpa_OneAuthority(t *testing.T) {
-	numNodes := 1
-	nodes, err := utils.InitializeAndStartNodes(t, numNodes, utils.GenesisDev, utils.ConfigDefault)
-	require.NoError(t, err)
+	genesisPath := libutils.GetDevGenesisSpecPathTest(t)
+	tomlConfig := config.Default()
+	tomlConfig.Core.BABELead = true
+	tomlConfig.Init.Genesis = genesisPath
+	n := node.New(t, tomlConfig)
 
-	defer func() {
-		errList := utils.StopNodes(t, nodes)
-		require.Len(t, errList, 0)
-	}()
+	ctx, cancel := context.WithCancel(context.Background())
 
-	time.Sleep(time.Second * 10)
-
-	compareChainHeadsWithRetry(t, nodes)
-	prev, _ := compareFinalizedHeads(t, nodes)
+	n.InitAndStartTest(ctx, t, cancel)
+	nodes := node.Nodes{n}
 
 	time.Sleep(time.Second * 10)
-	curr, _ := compareFinalizedHeads(t, nodes)
+
+	const getChainHeadTimeout = time.Second
+	compareChainHeadsWithRetry(ctx, nodes, getChainHeadTimeout)
+
+	const getFinalizedHeadTimeout = time.Second
+	prev, _ := compareFinalizedHeads(ctx, t, nodes, getFinalizedHeadTimeout)
+
+	time.Sleep(time.Second * 10)
+	curr, _ := compareFinalizedHeads(ctx, t, nodes, getFinalizedHeadTimeout)
 	require.NotEqual(t, prev, curr)
 }
 
 func TestStress_Grandpa_ThreeAuthorities(t *testing.T) {
 	t.Skip()
 
-	utils.GenerateGenesisThreeAuth()
-	defer os.Remove(utils.GenesisThreeAuths)
+	const numNodes = 3
 
-	numNodes := 3
-	nodes, err := utils.InitializeAndStartNodes(t, numNodes, utils.GenesisThreeAuths, utils.ConfigDefault)
-	require.NoError(t, err)
+	genesisPath := utils.GenerateGenesisAuths(t, numNodes)
 
-	defer func() {
-		errList := utils.StopNodes(t, nodes)
-		require.Len(t, errList, 0)
-	}()
+	tomlConfig := config.Default()
+	tomlConfig.Init.Genesis = genesisPath
+	nodes := node.MakeNodes(t, numNodes, tomlConfig)
 
-	numRounds := 5
-	for i := 1; i < numRounds+1; i++ {
-		fin, err := compareFinalizedHeadsWithRetry(t, nodes, uint64(i))
+	ctx, cancel := context.WithCancel(context.Background())
+
+	nodes.InitAndStartTest(ctx, t, cancel)
+
+	const numRounds uint64 = 5
+	for round := uint64(1); round < numRounds+1; round++ {
+		const retryWait = time.Second
+		err := retry.UntilNoError(ctx, retryWait, func() (err error) {
+			const getFinalizedHeadByRoundTimeout = time.Second
+			_, err = compareFinalizedHeadsByRound(ctx, nodes, round, getFinalizedHeadByRoundTimeout)
+			return err
+		})
 		require.NoError(t, err)
-		t.Logf("finalised hash in round %d: %s", i, fin)
 	}
 }
 
 func TestStress_Grandpa_SixAuthorities(t *testing.T) {
 	t.Skip()
-	utils.GenerateGenesisSixAuth(t)
-	defer os.Remove(utils.GenesisSixAuths)
 
-	numNodes := 6
-	nodes, err := utils.InitializeAndStartNodes(t, numNodes, utils.GenesisSixAuths, utils.ConfigDefault)
-	require.NoError(t, err)
+	const numNodes = 6
+	genesisPath := utils.GenerateGenesisAuths(t, numNodes)
 
-	defer func() {
-		errList := utils.StopNodes(t, nodes)
-		require.Len(t, errList, 0)
-	}()
+	tomlConfig := config.Default()
+	tomlConfig.Init.Genesis = genesisPath
+	nodes := node.MakeNodes(t, numNodes, tomlConfig)
+	ctx, cancel := context.WithCancel(context.Background())
+	nodes.InitAndStartTest(ctx, t, cancel)
 
-	numRounds := 10
-	for i := 1; i < numRounds+1; i++ {
-		fin, err := compareFinalizedHeadsWithRetry(t, nodes, uint64(i))
+	const numRounds uint64 = 10
+	for round := uint64(1); round < numRounds+1; round++ {
+		const retryWait = time.Second
+		err := retry.UntilNoError(ctx, retryWait, func() (err error) {
+			const getFinalizedHeadByRoundTimeout = time.Second
+			_, err = compareFinalizedHeadsByRound(ctx, nodes, round, getFinalizedHeadByRoundTimeout)
+			return err
+		})
 		require.NoError(t, err)
-		t.Logf("finalised hash in round %d: %s", i, fin)
 	}
 }
 
@@ -83,23 +97,24 @@ func TestStress_Grandpa_NineAuthorities(t *testing.T) {
 		t.Skip("skipping TestStress_Grandpa_NineAuthorities")
 	}
 
-	utils.CreateConfigLogGrandpa()
-	defer os.Remove(utils.ConfigLogGrandpa)
+	const numNodes = 9
+	genesisPath := libutils.GetGssmrGenesisRawPathTest(t)
 
-	numNodes := 9
-	nodes, err := utils.InitializeAndStartNodes(t, numNodes, utils.GenesisDefault, utils.ConfigLogGrandpa)
-	require.NoError(t, err)
+	tomlConfig := config.LogGrandpa()
+	tomlConfig.Init.Genesis = genesisPath
+	nodes := node.MakeNodes(t, numNodes, tomlConfig)
+	ctx, cancel := context.WithCancel(context.Background())
+	nodes.InitAndStartTest(ctx, t, cancel)
 
-	defer func() {
-		errList := utils.StopNodes(t, nodes)
-		require.Len(t, errList, 0)
-	}()
-
-	numRounds := 3
-	for i := 1; i < numRounds+1; i++ {
-		fin, err := compareFinalizedHeadsWithRetry(t, nodes, uint64(i))
+	const numRounds uint64 = 3
+	for round := uint64(1); round < numRounds+1; round++ {
+		const retryWait = time.Second
+		err := retry.UntilNoError(ctx, retryWait, func() (err error) {
+			const getFinalizedHeadByRoundTimeout = time.Second
+			_, err = compareFinalizedHeadsByRound(ctx, nodes, round, getFinalizedHeadByRoundTimeout)
+			return err
+		})
 		require.NoError(t, err)
-		t.Logf("finalised hash in round %d: %s", i, fin)
 	}
 }
 
@@ -108,31 +123,29 @@ func TestStress_Grandpa_CatchUp(t *testing.T) {
 		t.Skip("skipping TestStress_Grandpa_CatchUp")
 	}
 
-	utils.GenerateGenesisSixAuth(t)
-	defer os.Remove(utils.GenesisSixAuths)
+	const numNodes = 6
+	genesisPath := utils.GenerateGenesisAuths(t, numNodes)
 
-	numNodes := 6
-	nodes, err := utils.InitializeAndStartNodes(t, numNodes-1, utils.GenesisSixAuths, utils.ConfigDefault)
-	require.NoError(t, err)
-
-	defer func() {
-		errList := utils.StopNodes(t, nodes)
-		require.Len(t, errList, 0)
-	}()
+	tomlConfig := config.Default()
+	tomlConfig.Init.Genesis = genesisPath
+	nodes := node.MakeNodes(t, numNodes, tomlConfig)
+	ctx, cancel := context.WithCancel(context.Background())
+	nodes.InitAndStartTest(ctx, t, cancel)
 
 	time.Sleep(time.Second * 70) // let some rounds run
 
-	node, err := utils.RunGossamer(t, numNodes-1,
-		utils.TestDir(t, utils.KeyList[numNodes-1]),
-		utils.GenesisSixAuths, utils.ConfigDefault,
-		false, false)
-	require.NoError(t, err)
+	node := node.New(t, tomlConfig, node.SetIndex(numNodes-1))
+	node.InitAndStartTest(ctx, t, cancel)
 	nodes = append(nodes, node)
 
-	numRounds := 10
-	for i := 1; i < numRounds+1; i++ {
-		fin, err := compareFinalizedHeadsWithRetry(t, nodes, uint64(i))
+	const numRounds uint64 = 10
+	for round := uint64(1); round < numRounds+1; round++ {
+		const retryWait = time.Second
+		err := retry.UntilNoError(ctx, retryWait, func() (err error) {
+			const getFinalizedHeadByRoundTimeout = time.Second
+			_, err = compareFinalizedHeadsByRound(ctx, nodes, round, getFinalizedHeadByRoundTimeout)
+			return err
+		})
 		require.NoError(t, err)
-		t.Logf("finalised hash in round %d: %s", i, fin)
 	}
 }

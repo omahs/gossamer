@@ -16,20 +16,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
-func (s *Service) validateTransaction(peerID peer.ID, head *types.Header, rt runtime.Instance,
+func (s *Service) validateTransaction(peerID peer.ID, rt runtime.Instance,
 	tx types.Extrinsic) (validity *transaction.Validity, valid bool, err error) {
-	s.storageState.Lock()
 
-	ts, err := s.storageState.TrieState(&head.StateRoot)
-	s.storageState.Unlock()
+	externalExt, err := s.BuildExternalTransaction(rt, tx)
 	if err != nil {
-		return nil, false, fmt.Errorf("cannot get trie state from storage for root %s: %w", head.StateRoot, err)
+		logger.Errorf("Unable to build transaction \n")
 	}
-
-	rt.SetContextStorage(ts)
-
-	// validate each transaction
-	externalExt := types.Extrinsic(append([]byte{byte(types.TxnExternal)}, tx...))
 	validity, err = rt.ValidateTransaction(externalExt)
 	if err != nil {
 		if errors.Is(err, runtime.ErrInvalidTransaction) {
@@ -72,15 +65,25 @@ func (s *Service) HandleTransactionMessage(peerID peer.ID, msg *network.Transact
 		return false, err
 	}
 
+	s.storageState.Lock()
+
+	ts, err := s.storageState.TrieState(&head.StateRoot)
+	s.storageState.Unlock()
+	if err != nil {
+		return false, fmt.Errorf("cannot get trie state from storage for root %s: %w", head.StateRoot, err)
+	}
+
 	hash := head.Hash()
 	rt, err := s.blockState.GetRuntime(&hash)
 	if err != nil {
 		return false, err
 	}
 
+	rt.SetContextStorage(ts)
+
 	allTxsAreValid := true
 	for _, tx := range txs {
-		validity, isValidTxn, err := s.validateTransaction(peerID, head, rt, tx)
+		validity, isValidTxn, err := s.validateTransaction(peerID, rt, tx)
 		if err != nil {
 			return false, fmt.Errorf("failed validating transaction for peerID %s: %w", peerID, err)
 		}

@@ -63,7 +63,7 @@ func TestHTTPServer_ServeHTTP(t *testing.T) {
 		SystemName: "gossamer",
 	}
 	sysAPI := system.NewService(si, nil)
-	bAPI := modules.NewMockBlockAPI()
+	bAPI := modules.NewMockeryBlockAPI()
 	sAPI := modules.NewMockStorageAPI()
 
 	TxStateAPI := modules.NewMockTransactionStateAPI()
@@ -110,6 +110,6 @@ func TestHTTPServer_ServeHTTP(t *testing.T) {
 
 		_, message, err := c.ReadMessage()
 		require.NoError(t, err)
-		require.Equal(t, item.expected, message)
+		require.Equal(t, string(item.expected), string(message))
 	}
 }

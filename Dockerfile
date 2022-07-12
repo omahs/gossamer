@@ -1,5 +1,5 @@
 ARG DEBIAN_VERSION=bullseye-slim
-ARG GO_VERSION=1.17-buster
+ARG GO_VERSION=1.18-buster
 
 FROM golang:${GO_VERSION} AS builder
 
@@ -16,11 +16,6 @@ RUN wget -qO- https://deb.nodesource.com/setup_14.x | bash - && \
 # Install subkey
 RUN wget -O /usr/local/bin/subkey https://chainbridge.ams3.digitaloceanspaces.com/subkey-v2.0.0 && \
     chmod +x /usr/local/bin/subkey
-
-# Polkadot JS dependencies
-WORKDIR /go/src/github.com/ChainSafe/gossamer/tests/polkadotjs_test
-COPY tests/polkadotjs_test/package.json tests/polkadotjs_test/package-lock.json ./
-RUN npm install
 
 WORKDIR /go/src/github.com/ChainSafe/gossamer
 

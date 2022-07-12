@@ -14,6 +14,10 @@ import (
 )
 
 func scaleEncodeBytes(t *testing.T, b ...byte) (encoded []byte) {
+	return scaleEncodeByteSlice(t, b)
+}
+
+func scaleEncodeByteSlice(t *testing.T, b []byte) (encoded []byte) {
 	encoded, err := scale.Marshal(b)
 	require.NoError(t, err)
 	return encoded
@@ -36,39 +40,40 @@ func Test_Decode(t *testing.T) {
 
 	testCases := map[string]struct {
 		reader     io.Reader
-		n          Node
+		n          *Node
 		errWrapped error
 		errMessage string
 	}{
 		"no data": {
 			reader:     bytes.NewReader(nil),
-			errWrapped: ErrReadHeaderByte,
-			errMessage: "cannot read header byte: EOF",
+			errWrapped: io.EOF,
+			errMessage: "decoding header: reading header byte: EOF",
 		},
-		"unknown node type": {
+		"unknown node variant": {
 			reader:     bytes.NewReader([]byte{0}),
-			errWrapped: ErrUnknownNodeType,
-			errMessage: "unknown node type: 0",
+			errWrapped: ErrVariantUnknown,
+			errMessage: "decoding header: decoding header byte: node variant is unknown: for header byte 00000000",
 		},
 		"leaf decoding error": {
 			reader: bytes.NewReader([]byte{
-				65, // node type 1 (leaf) and key length 1
+				leafVariant.bits | 1, // key length 1
 				// missing key data byte
 			}),
-			errWrapped: ErrReadKeyData,
-			errMessage: "cannot decode leaf: cannot decode key: cannot read key data: EOF",
+			errWrapped: io.EOF,
+			errMessage: "cannot decode leaf: cannot decode key: " +
+				"reading from reader: EOF",
 		},
 		"leaf success": {
 			reader: bytes.NewReader(
 				append(
 					[]byte{
-						65, // node type 1 (leaf) and key length 1
-						9,  // key data
+						leafVariant.bits | 1, // key length 1
+						9,                    // key data
 					},
 					scaleEncodeBytes(t, 1, 2, 3)...,
 				),
 			),
-			n: &Leaf{
+			n: &Node{
 				Key:   []byte{9},
 				Value: []byte{1, 2, 3},
 				Dirty: true,
@@ -76,23 +81,25 @@ func Test_Decode(t *testing.T) {
 		},
 		"branch decoding error": {
 			reader: bytes.NewReader([]byte{
-				129, // node type 2 (branch without value) and key length 1
+				branchVariant.bits | 1, // key length 1
 				// missing key data byte
 			}),
-			errWrapped: ErrReadKeyData,
-			errMessage: "cannot decode branch: cannot decode key: cannot read key data: EOF",
+			errWrapped: io.EOF,
+			errMessage: "cannot decode branch: cannot decode key: " +
+				"reading from reader: EOF",
 		},
 		"branch success": {
 			reader: bytes.NewReader(
 				[]byte{
-					129,  // node type 2 (branch without value) and key length 1
-					9,    // key data
-					0, 0, // no children bitmap
+					branchVariant.bits | 1, // key length 1
+					9,                      // key data
+					0, 0,                   // no children bitmap
 				},
 			),
-			n: &Branch{
-				Key:   []byte{9},
-				Dirty: true,
+			n: &Node{
+				Key:      []byte{9},
+				Children: make([]*Node, ChildrenCapacity),
+				Dirty:    true,
 			},
 		},
 	}
@@ -116,35 +123,39 @@ func Test_Decode(t *testing.T) {
 func Test_decodeBranch(t *testing.T) {
 	t.Parallel()
 
+	const childHashLength = 32
+	childHash := make([]byte, childHashLength)
+	for i := range childHash {
+		childHash[i] = byte(i)
+	}
+	scaleEncodedChildHash := scaleEncodeByteSlice(t, childHash)
+
 	testCases := map[string]struct {
-		reader     io.Reader
-		header     byte
-		branch     *Branch
-		errWrapped error
-		errMessage string
+		reader           io.Reader
+		variant          byte
+		partialKeyLength uint16
+		branch           *Node
+		errWrapped       error
+		errMessage       string
 	}{
-		"no data with header 1": {
-			reader:     bytes.NewBuffer(nil),
-			header:     65,
-			errWrapped: ErrNodeTypeIsNotABranch,
-			errMessage: "node type is not a branch: 1",
-		},
 		"key decoding error": {
 			reader: bytes.NewBuffer([]byte{
 				// missing key data byte
 			}),
-			header:     129, // node type 2 (branch without value) and key length 1
-			errWrapped: ErrReadKeyData,
-			errMessage: "cannot decode key: cannot read key data: EOF",
+			variant:          branchVariant.bits,
+			partialKeyLength: 1,
+			errWrapped:       io.EOF,
+			errMessage:       "cannot decode key: reading from reader: EOF",
 		},
 		"children bitmap read error": {
 			reader: bytes.NewBuffer([]byte{
 				9, // key data
 				// missing children bitmap 2 bytes
 			}),
-			header:     129, // node type 2 (branch without value) and key length 1
-			errWrapped: ErrReadChildrenBitmap,
-			errMessage: "cannot read children bitmap: EOF",
+			variant:          branchVariant.bits,
+			partialKeyLength: 1,
+			errWrapped:       ErrReadChildrenBitmap,
+			errMessage:       "cannot read children bitmap: EOF",
 		},
 		"children decoding error": {
 			reader: bytes.NewBuffer([]byte{
@@ -152,34 +163,36 @@ func Test_decodeBranch(t *testing.T) {
 				0, 4, // children bitmap
 				// missing children scale encoded data
 			}),
-			header:     129, // node type 2 (branch without value) and key length 1
-			errWrapped: ErrDecodeChildHash,
-			errMessage: "cannot decode child hash: at index 10: EOF",
+			variant:          branchVariant.bits,
+			partialKeyLength: 1,
+			errWrapped:       ErrDecodeChildHash,
+			errMessage:       "cannot decode child hash: at index 10: EOF",
 		},
-		"success node type 2": {
+		"success for branch variant": {
 			reader: bytes.NewBuffer(
 				concatByteSlices([][]byte{
-					{
-						9,    // key data
-						0, 4, // children bitmap
-					},
-					scaleEncodeBytes(t, 1, 2, 3, 4, 5), // child hash
+					{9},    // key data
+					{0, 4}, // children bitmap
+					scaleEncodedChildHash,
 				}),
 			),
-			header: 129, // node type 2 (branch without value) and key length 1
-			branch: &Branch{
+			variant:          branchVariant.bits,
+			partialKeyLength: 1,
+			branch: &Node{
 				Key: []byte{9},
-				Children: [16]Node{
+				Children: padRightChildren([]*Node{
 					nil, nil, nil, nil, nil,
 					nil, nil, nil, nil, nil,
-					&Leaf{
-						HashDigest: []byte{1, 2, 3, 4, 5},
+					{
+						HashDigest: childHash,
+						Dirty:      true,
 					},
-				},
-				Dirty: true,
+				}),
+				Dirty:       true,
+				Descendants: 1,
 			},
 		},
-		"value decoding error for node type 3": {
+		"value decoding error for branch with value variant": {
 			reader: bytes.NewBuffer(
 				concatByteSlices([][]byte{
 					{9},    // key data
@@ -187,30 +200,89 @@ func Test_decodeBranch(t *testing.T) {
 					// missing encoded branch value
 				}),
 			),
-			header:     193, // node type 3 (branch with value) and key length 1
-			errWrapped: ErrDecodeValue,
-			errMessage: "cannot decode value: EOF",
+			variant:          branchWithValueVariant.bits,
+			partialKeyLength: 1,
+			errWrapped:       ErrDecodeValue,
+			errMessage:       "cannot decode value: EOF",
 		},
-		"success node type 3": {
-			reader: bytes.NewBuffer(
-				concatByteSlices([][]byte{
-					{9},                                // key data
-					{0, 4},                             // children bitmap
-					scaleEncodeBytes(t, 7, 8, 9),       // branch value
-					scaleEncodeBytes(t, 1, 2, 3, 4, 5), // child hash
-				}),
-			),
-			header: 193, // node type 3 (branch with value) and key length 1
-			branch: &Branch{
+		"success for branch with value": {
+			reader: bytes.NewBuffer(concatByteSlices([][]byte{
+				{9},                          // key data
+				{0, 4},                       // children bitmap
+				scaleEncodeBytes(t, 7, 8, 9), // branch value
+				scaleEncodedChildHash,
+			})),
+			variant:          branchWithValueVariant.bits,
+			partialKeyLength: 1,
+			branch: &Node{
 				Key:   []byte{9},
 				Value: []byte{7, 8, 9},
-				Children: [16]Node{
+				Children: padRightChildren([]*Node{
 					nil, nil, nil, nil, nil,
 					nil, nil, nil, nil, nil,
-					&Leaf{
-						HashDigest: []byte{1, 2, 3, 4, 5},
+					{
+						HashDigest: childHash,
+						Dirty:      true,
 					},
-				},
+				}),
+				Dirty:       true,
+				Descendants: 1,
+			},
+		},
+		"branch with inlined node decoding error": {
+			reader: bytes.NewBuffer(concatByteSlices([][]byte{
+				{1},                        // key data
+				{0b0000_0001, 0b0000_0000}, // children bitmap
+				scaleEncodeBytes(t, 1),     // branch value
+				{0},                        // garbage inlined node
+			})),
+			variant:          branchWithValueVariant.bits,
+			partialKeyLength: 1,
+			errWrapped:       io.EOF,
+			errMessage: "decoding inlined child at index 0: " +
+				"decoding header: reading header byte: EOF",
+		},
+		"branch with inlined branch and leaf": {
+			reader: bytes.NewBuffer(concatByteSlices([][]byte{
+				{1},                        // key data
+				{0b0000_0011, 0b0000_0000}, // children bitmap
+				// top level inlined leaf less than 32 bytes
+				scaleEncodeByteSlice(t, concatByteSlices([][]byte{
+					{leafVariant.bits | 1}, // partial key length of 1
+					{2},                    // key data
+					scaleEncodeBytes(t, 2), // value data
+				})),
+				// top level inlined branch less than 32 bytes
+				scaleEncodeByteSlice(t, concatByteSlices([][]byte{
+					{branchWithValueVariant.bits | 1}, // partial key length of 1
+					{3},                               // key data
+					{0b0000_0001, 0b0000_0000},        // children bitmap
+					scaleEncodeBytes(t, 3),            // branch value
+					// bottom level leaf
+					scaleEncodeByteSlice(t, concatByteSlices([][]byte{
+						{leafVariant.bits | 1}, // partial key length of 1
+						{4},                    // key data
+						scaleEncodeBytes(t, 4), // value data
+					})),
+				})),
+			})),
+			variant:          branchVariant.bits,
+			partialKeyLength: 1,
+			branch: &Node{
+				Key:         []byte{1},
+				Descendants: 3,
+				Children: padRightChildren([]*Node{
+					{Key: []byte{2}, Value: []byte{2}, Dirty: true},
+					{
+						Key:         []byte{3},
+						Value:       []byte{3},
+						Dirty:       true,
+						Descendants: 1,
+						Children: padRightChildren([]*Node{
+							{Key: []byte{4}, Value: []byte{4}, Dirty: true},
+						}),
+					},
+				}),
 				Dirty: true,
 			},
 		},
@@ -221,7 +293,8 @@ func Test_decodeBranch(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			branch, err := decodeBranch(testCase.reader, testCase.header)
+			branch, err := decodeBranch(testCase.reader,
+				testCase.variant, testCase.partialKeyLength)
 
 			assert.ErrorIs(t, err, testCase.errWrapped)
 			if err != nil {
@@ -236,42 +309,40 @@ func Test_decodeLeaf(t *testing.T) {
 	t.Parallel()
 
 	testCases := map[string]struct {
-		reader     io.Reader
-		header     byte
-		leaf       *Leaf
-		errWrapped error
-		errMessage string
+		reader           io.Reader
+		variant          byte
+		partialKeyLength uint16
+		leaf             *Node
+		errWrapped       error
+		errMessage       string
 	}{
-		"no data with header 1": {
-			reader:     bytes.NewBuffer(nil),
-			header:     1,
-			errWrapped: ErrNodeTypeIsNotALeaf,
-			errMessage: "node type is not a leaf: 0",
-		},
 		"key decoding error": {
 			reader: bytes.NewBuffer([]byte{
 				// missing key data byte
 			}),
-			header:     65, // node type 1 (leaf) and key length 1
-			errWrapped: ErrReadKeyData,
-			errMessage: "cannot decode key: cannot read key data: EOF",
+			variant:          leafVariant.bits,
+			partialKeyLength: 1,
+			errWrapped:       io.EOF,
+			errMessage:       "cannot decode key: reading from reader: EOF",
 		},
 		"value decoding error": {
 			reader: bytes.NewBuffer([]byte{
 				9,        // key data
 				255, 255, // bad value data
 			}),
-			header:     65, // node type 1 (leaf) and key length 1
-			errWrapped: ErrDecodeValue,
-			errMessage: "cannot decode value: could not decode invalid integer",
+			variant:          leafVariant.bits,
+			partialKeyLength: 1,
+			errWrapped:       ErrDecodeValue,
+			errMessage:       "cannot decode value: could not decode invalid integer",
 		},
 		"zero value": {
 			reader: bytes.NewBuffer([]byte{
 				9, // key data
 				// missing value data
 			}),
-			header: 65, // node type 1 (leaf) and key length 1
-			leaf: &Leaf{
+			variant:          leafVariant.bits,
+			partialKeyLength: 1,
+			leaf: &Node{
 				Key:   []byte{9},
 				Dirty: true,
 			},
@@ -283,8 +354,9 @@ func Test_decodeLeaf(t *testing.T) {
 					scaleEncodeBytes(t, 1, 2, 3, 4, 5), // value data
 				}),
 			),
-			header: 65, // node type 1 (leaf) and key length 1
-			leaf: &Leaf{
+			variant:          leafVariant.bits,
+			partialKeyLength: 1,
+			leaf: &Node{
 				Key:   []byte{9},
 				Value: []byte{1, 2, 3, 4, 5},
 				Dirty: true,
@@ -297,7 +369,8 @@ func Test_decodeLeaf(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			leaf, err := decodeLeaf(testCase.reader, testCase.header)
+			leaf, err := decodeLeaf(testCase.reader,
+				testCase.partialKeyLength)
 
 			assert.ErrorIs(t, err, testCase.errWrapped)
 			if err != nil {

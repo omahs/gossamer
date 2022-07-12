@@ -4,8 +4,10 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/ChainSafe/gossamer/dot/network"
@@ -20,7 +22,8 @@ import (
 	"github.com/ChainSafe/gossamer/lib/runtime/wasmer"
 	"github.com/ChainSafe/gossamer/lib/services"
 	"github.com/ChainSafe/gossamer/lib/transaction"
-	"github.com/ChainSafe/gossamer/pkg/scale"
+	cscale "github.com/centrifuge/go-substrate-rpc-client/v4/scale"
+	ctypes "github.com/centrifuge/go-substrate-rpc-client/v4/types"
 )
 
 var (
@@ -48,7 +51,6 @@ type Service struct {
 	storageState     StorageState
 	transactionState TransactionState
 	net              Network
-	digestHandler    DigestHandler
 
 	// map of code substitutions keyed by block hash
 	codeSubstitute       map[common.Hash]string
@@ -69,7 +71,6 @@ type Config struct {
 	Network          Network
 	Keystore         *keystore.GlobalKeystore
 	Runtime          runtime.Instance
-	DigestHandler    DigestHandler
 
 	CodeSubstitutes      map[common.Hash]string
 	CodeSubstitutedState CodeSubstitutedState
@@ -94,10 +95,6 @@ func NewService(cfg *Config) (*Service, error) {
 		return nil, ErrNilNetwork
 	}
 
-	if cfg.DigestHandler == nil {
-		return nil, ErrNilDigestHandler
-	}
-
 	if cfg.CodeSubstitutedState == nil {
 		return nil, errNilCodeSubstitutedState
 	}
@@ -119,7 +116,6 @@ func NewService(cfg *Config) (*Service, error) {
 		blockAddCh:           blockAddCh,
 		codeSubstitute:       cfg.CodeSubstitutes,
 		codeSubstitutedState: cfg.CodeSubstitutedState,
-		digestHandler:        cfg.DigestHandler,
 	}
 
 	return srv, nil
@@ -147,7 +143,9 @@ func (s *Service) StorageRoot() (common.Hash, error) {
 		return common.Hash{}, ErrNilStorageState
 	}
 
+	s.storageState.Lock()
 	ts, err := s.storageState.TrieState(nil)
+	s.storageState.Unlock()
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -215,9 +213,6 @@ func (s *Service) handleBlock(block *types.Block, state *rtstorage.TrieState) er
 
 	logger.Debugf("imported block %s and stored state trie with root %s",
 		block.Header.Hash(), state.MustRoot())
-
-	// handle consensus digests
-	s.digestHandler.HandleDigests(&block.Header)
 
 	rt, err := s.blockState.GetRuntime(&block.Header.ParentHash)
 	if err != nil {
@@ -353,6 +348,9 @@ func (s *Service) handleChainReorg(prev, curr common.Hash) error {
 		return nil
 	}
 
+	s.storageState.Lock()
+	defer s.storageState.Unlock()
+
 	// Check transaction validation on the best block.
 	rt, err := s.blockState.GetRuntime(nil)
 	if err != nil {
@@ -372,14 +370,9 @@ func (s *Service) handleChainReorg(prev, curr common.Hash) error {
 
 		for _, ext := range *body {
 			logger.Tracef("validating transaction on re-org chain for extrinsic %s", ext)
-			encExt, err := scale.Marshal(ext)
-			if err != nil {
-				return err
-			}
-
-			// decode extrinsic and make sure it's not an inherent.
-			decExt := &types.ExtrinsicData{}
-			if err = decExt.DecodeVersion(encExt); err != nil {
+			decExt := &ctypes.Extrinsic{}
+			decoder := cscale.NewDecoder(bytes.NewReader(ext))
+			if err = decoder.Decode(&decExt); err != nil {
 				continue
 			}
 
@@ -388,14 +381,16 @@ func (s *Service) handleChainReorg(prev, curr common.Hash) error {
 				continue
 			}
 
-			externalExt := types.Extrinsic(append([]byte{byte(types.TxnExternal)}, encExt...))
+			externalExt, err := s.BuildExternalTransaction(rt, ext)
+			if err != nil {
+				return err
+			}
 			txv, err := rt.ValidateTransaction(externalExt)
 			if err != nil {
 				logger.Debugf("failed to validate transaction for extrinsic %s: %s", ext, err)
 				continue
 			}
-
-			vtx := transaction.NewValidTransaction(encExt, txv)
+			vtx := transaction.NewValidTransaction(ext, txv)
 			s.transactionState.AddToPool(vtx)
 		}
 	}
@@ -413,6 +408,9 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 		s.transactionState.RemoveExtrinsic(ext)
 	}
 
+	s.storageState.Lock()
+	defer s.storageState.Unlock()
+
 	// re-validate transactions in the pool and move them to the queue
 	txs := s.transactionState.PendingInPool()
 	for _, tx := range txs {
@@ -423,7 +421,12 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 			continue
 		}
 
-		txnValidity, err := rt.ValidateTransaction(tx.Extrinsic)
+		externalExt, err := s.BuildExternalTransaction(rt, tx.Extrinsic)
+		if err != nil {
+			logger.Errorf("Unable to build transaction \n")
+		}
+
+		txnValidity, err := rt.ValidateTransaction(externalExt)
 		if err != nil {
 			s.transactionState.RemoveExtrinsic(tx.Extrinsic)
 			continue
@@ -483,7 +486,9 @@ func (s *Service) GetRuntimeVersion(bhash *common.Hash) (runtime.Version, error)
 		}
 	}
 
+	s.storageState.Lock()
 	ts, err := s.storageState.TrieState(stateRootHash)
+	s.storageState.Unlock()
 	if err != nil {
 		return nil, err
 	}
@@ -507,20 +512,32 @@ func (s *Service) HandleSubmittedExtrinsic(ext types.Extrinsic) error {
 		return nil
 	}
 
-	ts, err := s.storageState.TrieState(nil)
+	bestBlockHash := s.blockState.BestBlockHash()
+
+	stateRoot, err := s.storageState.GetStateRootFromBlock(&bestBlockHash)
+	if err != nil {
+		return fmt.Errorf("could not get state root from block %s: %w", bestBlockHash, err)
+	}
+
+	s.storageState.Lock()
+	defer s.storageState.Unlock()
+	ts, err := s.storageState.TrieState(stateRoot)
 	if err != nil {
 		return err
 	}
 
-	rt, err := s.blockState.GetRuntime(nil)
+	rt, err := s.blockState.GetRuntime(&bestBlockHash)
 	if err != nil {
 		logger.Critical("failed to get runtime")
 		return err
 	}
 
 	rt.SetContextStorage(ts)
-	// the transaction source is External
-	externalExt := types.Extrinsic(append([]byte{byte(types.TxnExternal)}, ext...))
+	externalExt, err := s.BuildExternalTransaction(rt, ext)
+	if err != nil {
+		return err
+	}
+
 	txv, err := rt.ValidateTransaction(externalExt)
 	if err != nil {
 		return err
@@ -542,6 +559,9 @@ func (s *Service) GetMetadata(bhash *common.Hash) ([]byte, error) {
 		stateRootHash *common.Hash
 		err           error
 	)
+
+	s.storageState.Lock()
+	defer s.storageState.Unlock()
 
 	// If block hash is not nil then fetch the state root corresponding to the block.
 	if bhash != nil {
@@ -638,4 +658,26 @@ func (s *Service) GetReadProofAt(block common.Hash, keys [][]byte) (
 	}
 
 	return block, proofForKeys, nil
+}
+
+// BuildExternalTransaction builds an external transaction based on the current TransactionQueueAPIVersion
+// See https://paritytech.github.io/polkadot/src/sp_transaction_pool/runtime_api.rs.html#25-55
+func (s *Service) BuildExternalTransaction(rt runtime.Instance, ext types.Extrinsic) (types.Extrinsic, error) {
+	runtimeVersion, err := rt.Version()
+	if err != nil {
+		return types.Extrinsic{}, err
+	}
+
+	txQueueVersion := runtimeVersion.TaggedTransactionQueueVersion(runtimeVersion)
+	var externalExt types.Extrinsic
+	if txQueueVersion == 3 {
+		externalExt = types.Extrinsic(append([]byte{byte(types.TxnExternal)}, ext...))
+		externalExt = append(externalExt, s.blockState.BestBlockHash().ToBytes()...)
+	} else if txQueueVersion == 2 {
+		externalExt = types.Extrinsic(append([]byte{byte(types.TxnExternal)}, ext...))
+	} else {
+		logger.Errorf("invalid transactionQueue version: %v\n", txQueueVersion)
+		return types.Extrinsic{}, errInvalidTransactionQueueVersion
+	}
+	return externalExt, nil
 }

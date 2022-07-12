@@ -44,10 +44,9 @@ var (
 	// ErrEmptyRuntimeCode is returned when the storage :code is empty
 	ErrEmptyRuntimeCode = errors.New("new :code is empty")
 
-	// ErrNilDigestHandler is returned when the DigestHandler interface is nil
-	ErrNilDigestHandler = errors.New("cannot have nil DigestHandler")
-
 	errNilCodeSubstitutedState = errors.New("cannot have nil CodeSubstitutedStat")
+
+	errInvalidTransactionQueueVersion = errors.New("unsupported transaction queue version")
 )
 
 // ErrNilChannel is returned if a channel is nil

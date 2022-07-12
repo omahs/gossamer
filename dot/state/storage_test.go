@@ -10,6 +10,7 @@ import (
 	"github.com/ChainSafe/gossamer/dot/state/pruner"
 	"github.com/ChainSafe/gossamer/dot/telemetry"
 	"github.com/ChainSafe/gossamer/dot/types"
+	"github.com/ChainSafe/gossamer/internal/trie/node"
 	"github.com/ChainSafe/gossamer/lib/common"
 	"github.com/ChainSafe/gossamer/lib/genesis"
 	runtime "github.com/ChainSafe/gossamer/lib/runtime/storage"
@@ -179,7 +180,13 @@ func TestGetStorageChildAndGetStorageFromChild(t *testing.T) {
 		"0",
 	))
 
-	testChildTrie := trie.NewEmptyTrie()
+	trieRoot := &node.Node{
+		Key:   []byte{1, 2},
+		Value: []byte{3, 4},
+		Dirty: true,
+	}
+	testChildTrie := trie.NewTrie(trieRoot)
+
 	testChildTrie.Put([]byte("keyInsidechild"), []byte("voila"))
 
 	err = genTrie.PutChild([]byte("keyToChild"), testChildTrie)

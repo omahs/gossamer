@@ -65,10 +65,10 @@ type EpochState interface {
 	SetCurrentEpoch(epoch uint64) error
 	GetCurrentEpoch() (uint64, error)
 	SetEpochData(uint64, *types.EpochData) error
-	GetEpochData(epoch uint64) (*types.EpochData, error)
-	HasEpochData(epoch uint64) (bool, error)
-	GetConfigData(epoch uint64) (*types.ConfigData, error)
-	HasConfigData(epoch uint64) (bool, error)
+
+	GetEpochData(epoch uint64, header *types.Header) (*types.EpochData, error)
+	GetConfigData(epoch uint64, header *types.Header) (*types.ConfigData, error)
+
 	GetLatestConfigData() (*types.ConfigData, error)
 	GetStartSlotForEpoch(epoch uint64) (uint64, error)
 	GetEpochForBlock(header *types.Header) (uint64, error)

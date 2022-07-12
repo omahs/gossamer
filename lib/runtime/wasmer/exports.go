@@ -20,24 +20,11 @@ func (in *Instance) ValidateTransaction(e types.Extrinsic) (*transaction.Validit
 	if err != nil {
 		return nil, err
 	}
-
-	if ret[0] != 0 {
-		return nil, runtime.NewValidateTransactionError(ret)
-	}
-
-	v := transaction.NewValidity(0, [][]byte{{}}, [][]byte{{}}, 0, false)
-	err = scale.Unmarshal(ret[1:], v)
-
-	return v, err
+	return decodeValidity(ret)
 }
 
 // Version calls runtime function Core_Version
 func (in *Instance) Version() (runtime.Version, error) {
-	// kusama seems to use the legacy version format
-	if in.version != nil {
-		return in.version, nil
-	}
-
 	res, err := in.exec(runtime.CoreVersion, []byte{})
 	if err != nil {
 		return nil, err
@@ -139,13 +126,6 @@ func (in *Instance) ExecuteBlock(block *types.Block) ([]byte, error) {
 	b, err := block.DeepCopy()
 	if err != nil {
 		return nil, err
-	}
-
-	if in.version == nil {
-		in.version, err = in.Version()
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	b.Header.Digest = types.NewDigest()

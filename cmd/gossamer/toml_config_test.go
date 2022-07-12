@@ -16,7 +16,6 @@ import (
 // TestLoadConfig tests loading a toml configuration file
 func TestLoadConfig(t *testing.T) {
 	cfg, cfgFile := newTestConfigWithFile(t)
-	require.NotNil(t, cfg)
 
 	genFile := dot.NewTestGenesisRawFile(t, cfg)
 
@@ -25,9 +24,8 @@ func TestLoadConfig(t *testing.T) {
 	err := dot.InitNode(cfg)
 	require.NoError(t, err)
 
-	err = loadConfig(dotConfigToToml(cfg), cfgFile.Name())
+	err = loadConfig(dotConfigToToml(cfg), cfgFile)
 	require.NoError(t, err)
-	require.NotNil(t, cfg)
 }
 
 // TestLoadConfigGssmr tests loading the toml configuration file for gssmr
@@ -46,7 +44,6 @@ func TestLoadConfigGssmr(t *testing.T) {
 
 	err = loadConfig(dotConfigToToml(cfg), gssmrConfigPath)
 	require.NoError(t, err)
-	require.NotNil(t, cfg)
 }
 
 func TestLoadConfigKusama(t *testing.T) {

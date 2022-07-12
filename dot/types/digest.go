@@ -29,6 +29,10 @@ func (h ConsensusEngineID) ToBytes() []byte {
 	return b[:]
 }
 
+func (h ConsensusEngineID) String() string {
+	return fmt.Sprintf("0x%x", h.ToBytes())
+}
+
 // BabeEngineID is the hard-coded babe ID
 var BabeEngineID = ConsensusEngineID{'B', 'A', 'B', 'E'}
 
@@ -80,7 +84,7 @@ type ConsensusDigest struct {
 func (d ConsensusDigest) Index() uint { return 4 }
 
 // String returns the digest as a string
-func (d *ConsensusDigest) String() string {
+func (d ConsensusDigest) String() string {
 	return fmt.Sprintf("ConsensusDigest ConsensusEngineID=%s Data=0x%x", d.ConsensusEngineID.ToBytes(), d.Data)
 }
 

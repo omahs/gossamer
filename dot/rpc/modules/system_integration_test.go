@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 //go:build integration
-// +build integration
 
 package modules
 
@@ -299,12 +298,7 @@ func setupSystemModule(t *testing.T) *SystemModule {
 	aliceAcctInfo := types.AccountInfo{
 		Nonce: 3,
 		//RefCount: 0,
-		Data: struct {
-			Free       *scale.Uint128
-			Reserved   *scale.Uint128
-			MiscFrozen *scale.Uint128
-			FreeFrozen *scale.Uint128
-		}{
+		Data: types.AccountData{
 			Free:       scale.MustNewUint128(big.NewInt(0)),
 			Reserved:   scale.MustNewUint128(big.NewInt(0)),
 			MiscFrozen: scale.MustNewUint128(big.NewInt(0)),
@@ -381,8 +375,6 @@ func newCoreService(t *testing.T, srvc *state.Service) *core.Service {
 		gomock.AssignableToTypeOf(new(network.TransactionMessage))).
 		AnyTimes()
 
-	digestHandlerMock := NewMockDigestHandler(nil)
-
 	cfg := &core.Config{
 		Runtime:              rt,
 		Keystore:             ks,
@@ -392,7 +384,6 @@ func newCoreService(t *testing.T, srvc *state.Service) *core.Service {
 		EpochState:           srvc.Epoch,
 		Network:              mocknet,
 		CodeSubstitutedState: srvc.Base,
-		DigestHandler:        digestHandlerMock,
 	}
 
 	s, err := core.NewService(cfg)

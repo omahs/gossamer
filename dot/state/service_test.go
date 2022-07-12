@@ -316,13 +316,13 @@ func TestService_Rewind(t *testing.T) {
 	err = serv.Grandpa.setCurrentSetID(3)
 	require.NoError(t, err)
 
-	err = serv.Grandpa.setSetIDChangeAtBlock(1, 5)
+	err = serv.Grandpa.setChangeSetIDAtBlock(1, 5)
 	require.NoError(t, err)
 
-	err = serv.Grandpa.setSetIDChangeAtBlock(2, 8)
+	err = serv.Grandpa.setChangeSetIDAtBlock(2, 8)
 	require.NoError(t, err)
 
-	err = serv.Grandpa.setSetIDChangeAtBlock(3, 10)
+	err = serv.Grandpa.setChangeSetIDAtBlock(3, 10)
 	require.NoError(t, err)
 
 	AddBlocksToState(t, serv.Block, 12, false)
@@ -366,8 +366,6 @@ func TestService_Import(t *testing.T) {
 
 	genData, genTrie, genesisHeader := genesis.NewTestGenesisWithTrieAndHeader(t)
 	err := serv.Initialise(genData, genesisHeader, genTrie)
-	require.NoError(t, err)
-	err = serv.db.Close()
 	require.NoError(t, err)
 
 	tr := trie.NewEmptyTrie()

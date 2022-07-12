@@ -61,7 +61,10 @@ var (
 	ErrNotCommitMessage = errors.New("cannot get finalised hash from VoteMessage")
 
 	// ErrNoJustification is returned when no justification can be found for a block, ie. it has not been finalised
-	ErrNoJustification = errors.New("no justification found for block")
+	ErrNoJustification       = errors.New("no justification found for block")
+	ErrJustificationMismatch = errors.New("justification does not correspond to given block hash")
+
+	ErrBlockHashMismatch = errors.New("block hash does not correspond to given block number")
 
 	// ErrMinVotesNotMet is returned when the number of votes is less than the required minimum in a Justification
 	ErrMinVotesNotMet = errors.New("minimum number of votes not met in a Justification")
@@ -93,7 +96,8 @@ var (
 	// ErrAuthorityNotInSet is returned when a precommit within a justification is signed by a key not in the authority set
 	ErrAuthorityNotInSet = errors.New("authority is not in set")
 
-	errVoteExists              = errors.New("already have vote")
 	errVoteToSignatureMismatch = errors.New("votes and authority count mismatch")
-	errInvalidVoteBlock        = errors.New("block in vote is not descendant of previously finalised block")
+	errVoteBlockMismatch       = errors.New("block in vote is not descendant of previously finalised block")
+	errVoteFromSelf            = errors.New("got vote from ourselves")
+	errInvalidMultiplicity     = errors.New("more than two equivocatory votes for a voter")
 )

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ChainSafe/gossamer/dot/state"
 	"github.com/ChainSafe/gossamer/dot/types"
 	"github.com/ChainSafe/gossamer/lib/common"
 	"github.com/ChainSafe/gossamer/lib/crypto/sr25519"
@@ -730,61 +731,6 @@ func Test_verifier_verifyAuthorshipRight(t *testing.T) {
 	}
 }
 
-func TestVerificationManager_getConfigData(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mockBlockState := NewMockBlockState(ctrl)
-	mockEpochStateEmpty := NewMockEpochState(ctrl)
-	mockEpochStateHasErr := NewMockEpochState(ctrl)
-	mockEpochStateGetErr := NewMockEpochState(ctrl)
-
-	mockEpochStateEmpty.EXPECT().HasConfigData(uint64(0)).Return(false, nil)
-	mockEpochStateHasErr.EXPECT().HasConfigData(uint64(0)).Return(false, errNoConfigData)
-	mockEpochStateGetErr.EXPECT().HasConfigData(uint64(0)).Return(true, nil)
-	mockEpochStateGetErr.EXPECT().GetConfigData(uint64(0)).Return(nil, errNoConfigData)
-
-	vm0, err := NewVerificationManager(mockBlockState, mockEpochStateEmpty)
-	assert.NoError(t, err)
-	vm1, err := NewVerificationManager(mockBlockState, mockEpochStateHasErr)
-	assert.NoError(t, err)
-	vm2, err := NewVerificationManager(mockBlockState, mockEpochStateGetErr)
-	assert.NoError(t, err)
-	tests := []struct {
-		name   string
-		vm     *VerificationManager
-		epoch  uint64
-		exp    *types.ConfigData
-		expErr error
-	}{
-		{
-			name:   "cant find ConfigData",
-			vm:     vm0,
-			expErr: errNoConfigData,
-		},
-		{
-			name:   "hasConfigData error",
-			vm:     vm1,
-			expErr: errNoConfigData,
-		},
-		{
-			name:   "getConfigData error",
-			vm:     vm2,
-			expErr: errNoConfigData,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			v := tt.vm
-			res, err := v.getConfigData(tt.epoch)
-			if tt.expErr != nil {
-				assert.EqualError(t, err, tt.expErr.Error())
-			} else {
-				assert.NoError(t, err)
-			}
-			assert.Equal(t, tt.exp, res)
-		})
-	}
-}
-
 func TestVerificationManager_getVerifierInfo(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockBlockState := NewMockBlockState(ctrl)
@@ -793,22 +739,22 @@ func TestVerificationManager_getVerifierInfo(t *testing.T) {
 	mockEpochStateThresholdErr := NewMockEpochState(ctrl)
 	mockEpochStateOk := NewMockEpochState(ctrl)
 
-	mockEpochStateGetErr.EXPECT().GetEpochData(uint64(0)).Return(nil, errNoConfigData)
+	testHeader := types.NewEmptyHeader()
 
-	mockEpochStateHasErr.EXPECT().GetEpochData(uint64(0)).Return(&types.EpochData{}, nil)
-	mockEpochStateHasErr.EXPECT().HasConfigData(uint64(0)).Return(false, errNoConfigData)
+	mockEpochStateGetErr.EXPECT().GetEpochData(uint64(0), testHeader).Return(nil, state.ErrEpochNotInMemory)
 
-	mockEpochStateThresholdErr.EXPECT().GetEpochData(uint64(0)).Return(&types.EpochData{}, nil)
-	mockEpochStateThresholdErr.EXPECT().HasConfigData(uint64(0)).Return(true, nil)
-	mockEpochStateThresholdErr.EXPECT().GetConfigData(uint64(0)).
+	mockEpochStateHasErr.EXPECT().GetEpochData(uint64(0), testHeader).Return(&types.EpochData{}, nil)
+	mockEpochStateHasErr.EXPECT().GetConfigData(uint64(0), testHeader).Return(&types.ConfigData{}, state.ErrConfigNotFound)
+
+	mockEpochStateThresholdErr.EXPECT().GetEpochData(uint64(0), testHeader).Return(&types.EpochData{}, nil)
+	mockEpochStateThresholdErr.EXPECT().GetConfigData(uint64(0), testHeader).
 		Return(&types.ConfigData{
 			C1: 3,
 			C2: 1,
 		}, nil)
 
-	mockEpochStateOk.EXPECT().GetEpochData(uint64(0)).Return(&types.EpochData{}, nil)
-	mockEpochStateOk.EXPECT().HasConfigData(uint64(0)).Return(true, nil)
-	mockEpochStateOk.EXPECT().GetConfigData(uint64(0)).
+	mockEpochStateOk.EXPECT().GetEpochData(uint64(0), testHeader).Return(&types.EpochData{}, nil)
+	mockEpochStateOk.EXPECT().GetConfigData(uint64(0), testHeader).
 		Return(&types.ConfigData{
 			C1: 1,
 			C2: 3,
@@ -833,12 +779,12 @@ func TestVerificationManager_getVerifierInfo(t *testing.T) {
 		{
 			name:   "getEpochData error",
 			vm:     vm0,
-			expErr: fmt.Errorf("failed to get epoch data for epoch %d: %w", 0, errNoConfigData),
+			expErr: fmt.Errorf("failed to get epoch data for epoch %d: %w", 0, state.ErrEpochNotInMemory),
 		},
 		{
 			name:   "getConfigData error",
 			vm:     vm1,
-			expErr: fmt.Errorf("failed to get config data: %w", errNoConfigData),
+			expErr: fmt.Errorf("failed to get config data: %w", state.ErrConfigNotFound),
 		},
 		{
 			name:   "calculate threshold error",
@@ -856,7 +802,7 @@ func TestVerificationManager_getVerifierInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := tt.vm
-			res, err := v.getVerifierInfo(tt.epoch)
+			res, err := v.getVerifierInfo(tt.epoch, testHeader)
 			if tt.expErr != nil {
 				assert.EqualError(t, err, tt.expErr.Error())
 			} else {
@@ -905,15 +851,15 @@ func TestVerificationManager_VerifyBlock(t *testing.T) {
 		Return(uint64(0), errGetEpoch)
 
 	mockEpochStateSkipVerifyErr.EXPECT().GetEpochForBlock(testBlockHeaderEmpty).Return(uint64(1), nil)
-	mockEpochStateSkipVerifyErr.EXPECT().GetEpochData(uint64(1)).Return(nil, errGetEpochData)
+	mockEpochStateSkipVerifyErr.EXPECT().GetEpochData(uint64(1), testBlockHeaderEmpty).Return(nil, errGetEpochData)
 	mockEpochStateSkipVerifyErr.EXPECT().SkipVerify(testBlockHeaderEmpty).Return(false, errSkipVerify)
 
 	mockEpochStateSkipVerifyTrue.EXPECT().GetEpochForBlock(testBlockHeaderEmpty).Return(uint64(1), nil)
-	mockEpochStateSkipVerifyTrue.EXPECT().GetEpochData(uint64(1)).Return(nil, errGetEpochData)
+	mockEpochStateSkipVerifyTrue.EXPECT().GetEpochData(uint64(1), testBlockHeaderEmpty).Return(nil, errGetEpochData)
 	mockEpochStateSkipVerifyTrue.EXPECT().SkipVerify(testBlockHeaderEmpty).Return(true, nil)
 
 	mockEpochStateGetVerifierInfoErr.EXPECT().GetEpochForBlock(testBlockHeaderEmpty).Return(uint64(1), nil)
-	mockEpochStateGetVerifierInfoErr.EXPECT().GetEpochData(uint64(1)).
+	mockEpochStateGetVerifierInfoErr.EXPECT().GetEpochData(uint64(1), testBlockHeaderEmpty).
 		Return(nil, errGetEpochData)
 	mockEpochStateGetVerifierInfoErr.EXPECT().SkipVerify(testBlockHeaderEmpty).Return(false, nil)
 
@@ -1065,7 +1011,7 @@ func TestVerificationManager_SetOnDisabled(t *testing.T) {
 	mockEpochStateGetEpochErr.EXPECT().GetEpochForBlock(types.NewEmptyHeader()).Return(uint64(0), errGetEpoch)
 
 	mockEpochStateGetEpochDataErr.EXPECT().GetEpochForBlock(types.NewEmptyHeader()).Return(uint64(0), nil)
-	mockEpochStateGetEpochDataErr.EXPECT().GetEpochData(uint64(0)).Return(nil, errGetEpochData)
+	mockEpochStateGetEpochDataErr.EXPECT().GetEpochData(uint64(0), types.NewEmptyHeader()).Return(nil, errGetEpochData)
 
 	mockEpochStateIndexLenErr.EXPECT().GetEpochForBlock(types.NewEmptyHeader()).Return(uint64(2), nil)
 

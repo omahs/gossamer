@@ -20,7 +20,6 @@ import (
 	"github.com/ChainSafe/gossamer/internal/log"
 	"github.com/ChainSafe/gossamer/lib/common"
 	"github.com/ChainSafe/gossamer/lib/genesis"
-	"github.com/ChainSafe/gossamer/lib/runtime/life"
 	"github.com/ChainSafe/gossamer/lib/runtime/wasmer"
 	"github.com/ChainSafe/gossamer/lib/utils"
 	"github.com/urfave/cli"
@@ -43,22 +42,20 @@ var (
 // loadConfigFile loads a default config file if --chain is specified, a specific
 // config if --config is specified, or the default gossamer config otherwise.
 func loadConfigFile(ctx *cli.Context, cfg *ctoml.Config) (err error) {
-	// check --config flag and load toml configuration from config.toml
-	if cfgPath := ctx.GlobalString(ConfigFlag.Name); cfgPath != "" {
-		logger.Info("loading toml configuration from " + cfgPath + "...")
-		if cfg == nil {
-			cfg = &ctoml.Config{} // if configuration not set, create empty configuration
-		} else {
-			logger.Warn(
-				"overwriting default configuration with id " + cfg.Global.ID +
-					" with toml configuration values from " + cfgPath)
-		}
-		err = loadConfig(cfg, cfgPath) // load toml values into configuration
-	} else {
-		err = loadConfig(cfg, defaultGssmrConfigPath)
+	cfgPath := ctx.GlobalString(ConfigFlag.Name)
+	if cfgPath == "" {
+		return loadConfig(cfg, defaultGssmrConfigPath)
 	}
 
-	return err
+	logger.Info("loading toml configuration from " + cfgPath + "...")
+	if cfg == nil {
+		cfg = new(ctoml.Config)
+	} else {
+		logger.Warn(
+			"overwriting default configuration with id " + cfg.Global.ID +
+				" with toml configuration values from " + cfgPath)
+	}
+	return loadConfig(cfg, cfgPath)
 }
 
 func setupConfigFromChain(ctx *cli.Context) (*ctoml.Config, *dot.Config, error) {
@@ -215,15 +212,14 @@ func createImportStateConfig(ctx *cli.Context) (*dot.Config, error) {
 }
 
 func createBuildSpecConfig(ctx *cli.Context) (*dot.Config, error) {
-	var tomlCfg *ctoml.Config
-	cfg := &dot.Config{}
+	tomlCfg := new(ctoml.Config)
 	err := loadConfigFile(ctx, tomlCfg)
 	if err != nil {
 		logger.Errorf("failed to load toml configuration: %s", err)
 		return nil, err
 	}
 
-	// set global configuration values
+	cfg := new(dot.Config)
 	if err := setDotGlobalConfig(ctx, tomlCfg, &cfg.Global); err != nil {
 		logger.Errorf("failed to set global node configuration: %s", err)
 		return nil, err
@@ -458,7 +454,7 @@ func setDotGlobalConfigFromToml(tomlCfg *ctoml.Config, cfg *dot.GlobalConfig) {
 			}
 		}
 
-		cfg.MetricsPort = tomlCfg.Global.MetricsPort
+		cfg.MetricsAddress = tomlCfg.Global.MetricsAddress
 
 		cfg.RetainBlocks = tomlCfg.Global.RetainBlocks
 		cfg.Pruning = pruner.Mode(tomlCfg.Global.Pruning)
@@ -485,9 +481,9 @@ func setDotGlobalConfigFromFlags(ctx *cli.Context, cfg *dot.GlobalConfig) error 
 
 	cfg.PublishMetrics = ctx.Bool("publish-metrics")
 
-	// check --metrics-port flag and update node configuration
-	if metricsPort := ctx.GlobalUint(MetricsPortFlag.Name); metricsPort != 0 {
-		cfg.MetricsPort = uint32(metricsPort)
+	// check --metrics-address flag and update node configuration
+	if metricsAddress := ctx.GlobalString(MetricsAddressFlag.Name); metricsAddress != "" {
+		cfg.MetricsAddress = metricsAddress
 	}
 
 	cfg.RetainBlocks = ctx.Int64(RetainBlockNumberFlag.Name)
@@ -519,7 +515,7 @@ func setDotGlobalConfigFromFlags(ctx *cli.Context, cfg *dot.GlobalConfig) error 
 
 func setDotGlobalConfigName(ctx *cli.Context, tomlCfg *ctoml.Config, cfg *dot.GlobalConfig) error {
 	globalBasePath := utils.ExpandDir(cfg.BasePath)
-	initialised := dot.NodeInitialized(globalBasePath)
+	initialised := dot.IsNodeInitialised(globalBasePath)
 
 	// consider the --name flag as higher priority
 	if ctx.GlobalString(NameFlag.Name) != "" {
@@ -625,8 +621,6 @@ func setDotCoreConfig(ctx *cli.Context, tomlCfg ctoml.CoreConfig, cfg *dot.CoreC
 	switch tomlCfg.WasmInterpreter {
 	case wasmer.Name:
 		cfg.WasmInterpreter = wasmer.Name
-	case life.Name:
-		cfg.WasmInterpreter = life.Name
 	case "":
 		cfg.WasmInterpreter = gssmr.DefaultWasmInterpreter
 	default:
@@ -734,6 +728,28 @@ func setDotRPCConfig(ctx *cli.Context, tomlCfg ctoml.RPCConfig, cfg *dot.RPCConf
 	} else if ctx.IsSet(RPCExternalFlag.Name) && !external {
 		cfg.Enabled = true
 		cfg.External = false
+	}
+
+	// check --rpc-unsafe flag value
+	if rpcUnsafe := ctx.GlobalBool(RPCUnsafeEnabledFlag.Name); rpcUnsafe {
+		cfg.Unsafe = true
+	}
+
+	// check --rpc-unsafe-external flag value
+	if externalUnsafe := ctx.GlobalBool(RPCUnsafeExternalFlag.Name); externalUnsafe {
+		cfg.Unsafe = true
+		cfg.UnsafeExternal = true
+	}
+
+	// check --ws-unsafe flag value
+	if wsUnsafe := ctx.GlobalBool(WSUnsafeEnabledFlag.Name); wsUnsafe {
+		cfg.WSUnsafe = true
+	}
+
+	// check --ws-unsafe-external flag value
+	if wsExternalUnsafe := ctx.GlobalBool(WSUnsafeExternalFlag.Name); wsExternalUnsafe {
+		cfg.WSUnsafe = true
+		cfg.WSUnsafeExternal = true
 	}
 
 	// check --rpcport flag and update node configuration

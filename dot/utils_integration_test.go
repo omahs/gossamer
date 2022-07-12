@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 //go:build integration
-// +build integration
 
 package dot
 
@@ -16,7 +15,6 @@ import (
 
 func TestTrieSnapshot(t *testing.T) {
 	cfg := NewTestConfig(t)
-	require.NotNil(t, cfg)
 
 	genRawFile := NewTestGenesisRawFile(t, cfg)
 
