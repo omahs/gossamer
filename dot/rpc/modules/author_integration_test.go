@@ -520,14 +520,6 @@ func TestAuthorModule_SubmitExtrinsic_WithVersion_V0910(t *testing.T) {
 	extHex := runtime.NewTestExtrinsic(t,
 		integrationTestController.runtime, genesisHash, genesisHash, 1, "System.remark", []byte{0xab, 0xcd})
 
-	// to extrinsic works with a runtime version 0910 we need to
-	// append the block hash bytes at the end of the extrinsics
-	//hashBytes := genesisHash.ToBytes()
-	//extBytes := append(common.MustHexToBytes(extHex), hashBytes...)
-	//externalExt := types.Extrinsic(append([]byte{byte(types.TxnExternal)}, common.MustHexToBytes(extHex)...))
-
-	//extHex = common.BytesToHex(extBytes)
-
 	net2test := coremocks.NewMockNetwork(ctrl)
 	net2test.EXPECT().GossipMessage(&network.TransactionMessage{
 		Extrinsics: []types.Extrinsic{common.MustHexToBytes(extHex)},

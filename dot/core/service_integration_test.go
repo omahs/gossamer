@@ -129,7 +129,6 @@ func generateTestValidRemarkTxns(t *testing.T, genesisFilePath string,
 		0, "System.remark", testCallArguments)
 
 	extBytes := common.MustHexToBytes(extHex)
-	//InitializeRuntimeToTestLatestTxnQueue(t, rt, genesisHeader.Hash())
 	runtime.InitializeRuntimeToTest(t, rt, genesisHeader.Hash())
 	return extBytes, rt
 }
@@ -472,7 +471,6 @@ func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
 		Extrinsic: types.Extrinsic(encExt),
 		Validity:  &transaction.Validity{Priority: 1},
 	}
-
 	_ = transactionState.AddToPool(tx)
 
 	service := NewTestService(t, cfg)
@@ -526,6 +524,7 @@ func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
 	telemetryMock.EXPECT().SendMessage(gomock.Any()).AnyTimes()
 
 	ts := state.NewTransactionState(telemetryMock)
+
 	// Maybe replace validity
 	tx := &transaction.ValidTransaction{
 		Extrinsic: types.Extrinsic(extrinsicBytes),
@@ -549,7 +548,6 @@ func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
 		}
 		res = append(res, tx)
 	}
-	// Extrinsic is removed. so empty res
 	require.Empty(t, res)
 }
 
