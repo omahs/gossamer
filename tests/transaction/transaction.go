@@ -8,90 +8,6 @@ import (
 	"math/big"
 )
 
-//
-//func main() {
-//	sender, err := signature.KeyringPairFromSecret("ethics furnace bird nerve mean call title blossom ill verify grass proud", 42) // test4
-//	if err != nil {
-//		panic(err)
-//	}
-//	api, err := gsrpc.NewSubstrateAPI("ws://127.0.0.1:8546")
-//	if err != nil {
-//		fmt.Println(err)
-//	}
-//	hash, err := api.RPC.Chain.GetBlockHashLatest()
-//	if err != nil {
-//		fmt.Println(err)
-//	}
-//	fmt.Println("Hash: ", hash)
-//
-//	meta, err := api.RPC.State.GetMetadataLatest()
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Println("Got meta")
-//
-//	test2Account, err := types.NewAddressFromHexAccountID("4617579c92b915a76ade267fb42ba5a28f10b51686f84aa968b0270ea2fc7243") // TEST2 account
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	c, err := types.NewCall(meta, "Balances.transfer", test2Account, types.NewUCompactFromUInt(1000000000000))
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Println("call works")
-//
-//	ext := types.NewExtrinsic(c)
-//
-//	genesisHash, err := api.RPC.Chain.GetBlockHash(0)
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Println("got block hash")
-//	rv, err := api.RPC.State.GetRuntimeVersionLatest()
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	key, err := types.CreateStorageKey(meta, "System", "Account", sender.PublicKey, nil)
-//	if err != nil {
-//		panic(err)
-//	}
-//	fmt.Println("created storage key")
-//	var accountInfo types.AccountInfo
-//	ok, err := api.RPC.State.GetStorageLatest(key, &accountInfo)
-//	if err != nil || !ok {
-//		fmt.Println(err)
-//		panic(err)
-//	}
-//	fmt.Println("got storage latest")
-//
-//	options := types.SignatureOptions{
-//		BlockHash:          genesisHash,
-//		Era:                types.ExtrinsicEra{IsMortalEra: false},
-//		GenesisHash:        genesisHash,
-//		Nonce:              types.NewUCompactFromUInt(uint64(accountInfo.Nonce)),
-//		SpecVersion:        rv.SpecVersion,
-//		Tip:                types.NewUCompactFromUInt(0),
-//		TransactionVersion: rv.TransactionVersion,
-//	}
-//	fmt.Println("options")
-//	err = ext.Sign(sender, options)
-//	if err != nil {
-//		fmt.Println(err)
-//		panic(err)
-//	}
-//
-//	fmt.Println("signed")
-//
-//	hash, err = api.RPC.Author.SubmitExtrinsic(ext)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	fmt.Printf("Transfer sent with hash %#x\n", hash)
-//}
-
 func main() {
 	// This sample shows how to create a transaction to make a transfer from one an account to another.
 
@@ -113,7 +29,7 @@ func main() {
 	}
 
 	// 1 unit of transfer
-	bal, ok := new(big.Int).SetString("100000000000000", 10)
+	bal, ok := new(big.Int).SetString("10000000000000000", 10)
 	if !ok {
 		panic(fmt.Errorf("failed to convert balance"))
 	}
