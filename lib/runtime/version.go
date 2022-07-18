@@ -11,6 +11,21 @@ import (
 	"github.com/ChainSafe/gossamer/pkg/scale"
 )
 
+// Blake2-8("TaggedTransactionQueue")
+var encodedTaggedTransactionQueue = [8]byte{0xd2, 0xbc, 0x98, 0x97, 0xee, 0xd0, 0x8f, 0x15}
+
+// TaggedTransactionQueueVersion returns the TaggedTransactionQueueAPI version
+func TaggedTransactionQueueVersion(runtimeVersion Version) uint32 {
+	txQueueVersion := uint32(0)
+	for _, v := range runtimeVersion.APIItems {
+		if v.Name == encodedTaggedTransactionQueue {
+			txQueueVersion = v.Ver
+			break
+		}
+	}
+	return txQueueVersion
+}
+
 // APIItem struct to hold runtime API Name and Version
 type APIItem struct {
 	Name [8]byte

@@ -143,7 +143,7 @@ func GetRuntime(ctx context.Context, runtime string) (
 	if err != nil {
 		return "", fmt.Errorf("cannot close HTTP response body: %w", err)
 	}
-
+	
 	return runtimePath, nil
 }
 
@@ -234,7 +234,6 @@ func NewTestExtrinsic(t *testing.T, rt Instance, genHash, blockHash common.Hash,
 
 	extEnc, err := ctypes.EncodeToHex(ext)
 	require.NoError(t, err)
-
 	return extEnc
 }
 
