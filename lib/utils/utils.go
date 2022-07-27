@@ -204,6 +204,16 @@ func GetGssmrV3SubstrateGenesisRawPath() (path string, err error) {
 	return filepath.Join(rootPath, "./chain/gssmr-v3substrate/genesis.json"), nil
 }
 
+// GetGssmrLatestTxnQueueGenesisPath gets the GssmrLatestTxnQueue genesis path
+// and returns an error if it cannot find it.
+func GetGssmrLatestTxnQueueGenesisRawPath() (path string, err error) {
+	rootPath, err := GetProjectRootPath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(rootPath, "./chain/gssmrLatestTxnQueue/genesis.json"), nil
+}
+
 // GetDevGenesisPath gets the dev genesis path
 func GetDevGenesisPath(t *testing.T) string {
 	return filepath.Join(GetProjectRootPathTest(t), "./chain/dev/genesis.json")

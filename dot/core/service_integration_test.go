@@ -422,7 +422,8 @@ func TestMaintainTransactionPool_EmptyBlock(t *testing.T) {
 	keyring, err := keystore.NewSr25519Keyring()
 	require.NoError(t, err)
 	alicePub := common.MustHexToBytes(keyring.Alice().Public().Hex())
-	genesisFilePath := "chain/gssmr/genesis.json"
+	genesisFilePath, err := utils.GetGssmrGenesisRawPath()
+	require.NoError(t, err)
 	encExt, runtimeInstance := generateTestValidRemarkTxns(t, genesisFilePath, alicePub, accountInfo)
 	cfg := &Config{
 		Runtime: runtimeInstance,
@@ -481,7 +482,8 @@ func TestMaintainTransactionPool_BlockWithExtrinsics(t *testing.T) {
 	keyring, err := keystore.NewSr25519Keyring()
 	require.NoError(t, err)
 	alicePub := common.MustHexToBytes(keyring.Alice().Public().Hex())
-	genesisFilePath := "chain/gssmr/genesis.json"
+	genesisFilePath, err := utils.GetGssmrGenesisRawPath()
+	require.NoError(t, err)
 	extrinsicBytes, runtimeInstance := generateTestValidRemarkTxns(t, genesisFilePath, alicePub, accountInfo)
 	cfg := &Config{
 		Runtime: runtimeInstance,
