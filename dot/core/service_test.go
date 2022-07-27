@@ -551,7 +551,6 @@ func Test_Service_maintainTransactionPool(t *testing.T) {
 		testHeader := types.NewEmptyHeader()
 		block := types.NewBlock(*testHeader, *types.NewBody([]types.Extrinsic{[]byte{21}}))
 		block.Header.Number = 21
-		service := &Service{}
 
 		validity := &transaction.Validity{
 			Priority: 0x3e8,
@@ -580,7 +579,7 @@ func Test_Service_maintainTransactionPool(t *testing.T) {
 			authoringVersion,
 			specVersion,
 			implVersion,
-			[]runtime.APIItem{runtime.APIItem{
+			[]runtime.APIItem{{
 				Name: [8]byte{0xd2, 0xbc, 0x98, 0x97, 0xee, 0xd0, 0x8f, 0x15},
 				Ver:  3,
 			}},
@@ -593,7 +592,7 @@ func Test_Service_maintainTransactionPool(t *testing.T) {
 		mockBlockState.EXPECT().GetRuntime(nil).Return(runtimeMock, nil)
 		mockBlockState.EXPECT().BestBlockHash().Return(common.Hash{})
 		mockStorageState := NewMockStorageState(ctrl)
-		service = &Service{
+		service := &Service{
 			transactionState: mockTxnState,
 			blockState:       mockBlockState,
 			storageState:     mockStorageState,
@@ -636,7 +635,7 @@ func Test_Service_maintainTransactionPool(t *testing.T) {
 			authoringVersion,
 			specVersion,
 			implVersion,
-			[]runtime.APIItem{runtime.APIItem{
+			[]runtime.APIItem{{
 				Name: [8]byte{0xd2, 0xbc, 0x98, 0x97, 0xee, 0xd0, 0x8f, 0x15},
 				Ver:  3,
 			}},
@@ -747,7 +746,7 @@ func Test_Service_handleBlocksAsync(t *testing.T) {
 			authoringVersion,
 			specVersion,
 			implVersion,
-			[]runtime.APIItem{runtime.APIItem{
+			[]runtime.APIItem{{
 				Name: [8]byte{0xd2, 0xbc, 0x98, 0x97, 0xee, 0xd0, 0x8f, 0x15},
 				Ver:  3,
 			}},
@@ -903,7 +902,7 @@ func TestService_handleChainReorg(t *testing.T) {
 			authoringVersion,
 			specVersion,
 			implVersion,
-			[]runtime.APIItem{runtime.APIItem{
+			[]runtime.APIItem{{
 				Name: [8]byte{0xd2, 0xbc, 0x98, 0x97, 0xee, 0xd0, 0x8f, 0x15},
 				Ver:  3,
 			}},
@@ -938,7 +937,7 @@ func TestService_handleChainReorg(t *testing.T) {
 			authoringVersion,
 			specVersion,
 			implVersion,
-			[]runtime.APIItem{runtime.APIItem{
+			[]runtime.APIItem{{
 				Name: [8]byte{0xd2, 0xbc, 0x98, 0x97, 0xee, 0xd0, 0x8f, 0x15},
 				Ver:  3,
 			}},
@@ -1277,7 +1276,7 @@ func TestServiceHandleSubmittedExtrinsic(t *testing.T) {
 			authoringVersion,
 			specVersion,
 			implVersion,
-			[]runtime.APIItem{runtime.APIItem{
+			[]runtime.APIItem{{
 				Name: [8]byte{0xd2, 0xbc, 0x98, 0x97, 0xee, 0xd0, 0x8f, 0x15},
 				Ver:  3,
 			}},
@@ -1308,7 +1307,7 @@ func TestServiceHandleSubmittedExtrinsic(t *testing.T) {
 			authoringVersion,
 			specVersion,
 			implVersion,
-			[]runtime.APIItem{runtime.APIItem{
+			[]runtime.APIItem{{
 				Name: [8]byte{0xd2, 0xbc, 0x98, 0x97, 0xee, 0xd0, 0x8f, 0x15},
 				Ver:  3,
 			}},
