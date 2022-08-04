@@ -85,14 +85,13 @@ func generateTestValidRemarkTxnsLatestRuntime(t *testing.T, genesisFilePath stri
 		Number:    0,
 		StateRoot: genTrie.MustHash(),
 	}
-	
+
 	// Hash of encrypted centrifuge extrinsic
 	testCallArguments := []byte{0xab, 0xcd}
 	extHex := runtime.NewTestExtrinsic(t, rt, genesisHeader.Hash(), genesisHeader.Hash(),
 		0, "System.remark", testCallArguments)
 	extBytes := common.MustHexToBytes(extHex)
 
-	// error is from here (prob with formatting)
 	runtime.InitializeRuntimeLatestToTest(t, rt, genesisHeader.Hash())
 	return extBytes, rt
 }
@@ -549,6 +548,8 @@ func TestMaintainTransactionPoolLatestTxnQueue_EmptyBlock(t *testing.T) {
 	}
 	_ = transactionState.AddToPool(tx)
 
+	// We are creating a new genesis!!!
+	// And its with a different runtime!!!
 	service := NewTestService(t, cfg)
 	service.transactionState = transactionState
 
