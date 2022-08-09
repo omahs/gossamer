@@ -444,6 +444,9 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 
 		transactionValidity, transactionValidityErr, err := rt.ValidateTransaction(externalExt)
 		if err != nil || transactionValidityErr != nil {
+			// Err is nil, so hitting txn validity not nil
+			// Is it wrong or is it not empty
+			fmt.Println(transactionValidityErr)
 			s.transactionState.RemoveExtrinsic(tx.Extrinsic)
 			continue
 		}
@@ -451,6 +454,8 @@ func (s *Service) maintainTransactionPool(block *types.Block) {
 
 		tx = transaction.NewValidTransaction(tx.Extrinsic, transactionValidity)
 
+		fmt.Println("ext ")
+		fmt.Println(tx.Extrinsic)
 		// Err is only thrown if tx is already in pool, in which case it still gets removed
 		h, _ := s.transactionState.Push(tx)
 		s.transactionState.RemoveExtrinsicFromPool(tx.Extrinsic)
