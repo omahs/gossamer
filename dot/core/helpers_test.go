@@ -24,6 +24,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func balanceKey(t *testing.T, pub []byte) (bKey []byte) {
+	t.Helper()
+
+	h0, err := common.Twox128Hash([]byte("System"))
+	require.NoError(t, err)
+	bKey = append(bKey, h0...)
+	h1, err := common.Twox128Hash([]byte("Account"))
+	require.NoError(t, err)
+	bKey = append(bKey, h1...)
+	h2, err := common.Blake2b128(pub)
+	require.NoError(t, err)
+	bKey = append(bKey, h2...)
+	bKey = append(bKey, pub...)
+	return
+}
+
 // Note might need to pass in Config but will see
 // CreateTestService is a new helper function to clean up orchestration for testing the txnPool
 func CreateTestService(t *testing.T, genesisFilePath string,
@@ -112,11 +128,10 @@ func CreateTestService(t *testing.T, genesisFilePath string,
 	// Runtime stuff
 	if cfg.Runtime == nil {
 		// Okay no errors, but test doesn't pass
-		var rtCfg runtime.InstanceConfig
+		var rtCfg wasmer.Config
 
 		var err error
-		rtCfg.Storage, err = rtstorage.NewTrieState(genTrie)
-		require.NoError(t, err)
+		rtCfg.Storage = rtstorage.NewTrieState(genTrie)
 
 		rtCfg.CodeHash, err = cfg.StorageState.LoadCodeHash(nil)
 		require.NoError(t, err)

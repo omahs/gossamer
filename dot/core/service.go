@@ -626,7 +626,7 @@ func (s *Service) buildExternalTransaction(rt runtime.Instance, ext types.Extrin
 		return types.Extrinsic{}, fmt.Errorf("getting runtime version: %w", err)
 	}
 
-	txQueueVersion := runtimeVersion.TaggedTransactionQueueVersion(runtimeVersion)
+	txQueueVersion := runtime.TaggedTransactionQueueVersion(runtimeVersion)
 	var externalExt types.Extrinsic
 	switch txQueueVersion {
 	case supportedTxVersion:

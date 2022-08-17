@@ -4,6 +4,8 @@
 package core
 
 import (
+	"github.com/ChainSafe/gossamer/lib/keystore"
+	txnvalidity "github.com/ChainSafe/gossamer/lib/runtime/transaction_validity"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -16,6 +18,41 @@ import (
 	rtstorage "github.com/ChainSafe/gossamer/lib/runtime/storage"
 	"github.com/ChainSafe/gossamer/lib/transaction"
 )
+
+//go:generate mockery --name Instance --structname Instance --case underscore --keeptree
+
+// Instance is the interface a v0.8 runtime instance must implement
+type Instance interface {
+	UpdateRuntimeCode([]byte) error
+	Stop()
+	NodeStorage() runtime.NodeStorage
+	NetworkService() runtime.BasicNetwork
+	Keystore() *keystore.GlobalKeystore
+	Validator() bool
+	Exec(function string, data []byte) ([]byte, error)
+	SetContextStorage(s runtime.Storage) // used to set the TrieState before a runtime call
+
+	GetCodeHash() common.Hash
+	Version() (runtime.Version, error)
+	Metadata() ([]byte, error)
+	BabeConfiguration() (*types.BabeConfiguration, error)
+	GrandpaAuthorities() ([]types.Authority, error)
+	ValidateTransaction(e types.Extrinsic) (*transaction.Validity, *txnvalidity.TransactionValidityError, error)
+	InitializeBlock(header *types.Header) error
+	InherentExtrinsics(data []byte) ([]byte, error)
+	ApplyExtrinsic(data types.Extrinsic) ([]byte, error)
+	FinalizeBlock() (*types.Header, error)
+	ExecuteBlock(block *types.Block) ([]byte, error)
+	DecodeSessionKeys(enc []byte) ([]byte, error)
+	PaymentQueryInfo(ext []byte) (*types.TransactionPaymentQueryInfo, error)
+
+	CheckInherents() // TODO: use this in block verification process (#1873)
+
+	// parameters and return values for these are undefined in the spec
+	RandomSeed()
+	OffchainWorker()
+	GenerateSessionKeys()
+}
 
 //go:generate mockgen -destination=mock_core_test.go -package $GOPACKAGE . BlockState,StorageState,TransactionState,Network,EpochState,CodeSubstitutedState
 

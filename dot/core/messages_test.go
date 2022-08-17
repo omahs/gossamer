@@ -66,12 +66,6 @@ type mockSetContextStorage struct {
 	trieState *storage.TrieState
 }
 
-// nolint
-type mockVersion struct {
-	version *mocksruntime.Version
-	err     error
-}
-
 type mockValidateTxn struct {
 	input       types.Extrinsic
 	validity    *transaction.Validity
@@ -83,7 +77,6 @@ type mockRuntime struct {
 	runtime           *mocksruntime.Instance
 	setContextStorage *mockSetContextStorage
 	validateTxn       *mockValidateTxn
-	version           *mockVersion
 	skipLoop          bool
 }
 
@@ -284,7 +277,7 @@ func TestServiceHandleTransactionMessage(t *testing.T) {
 			mockRuntime: &mockRuntime{
 				runtime:           runtimeMock2,
 				setContextStorage: &mockSetContextStorage{trieState: &storage.TrieState{}},
-				version:           &mockVersion{},
+
 				validateTxn: &mockValidateTxn{
 					input: types.Extrinsic(concatenateByteSlices([][]byte{
 						{byte(types.TxnExternal)},
@@ -337,7 +330,6 @@ func TestServiceHandleTransactionMessage(t *testing.T) {
 			mockRuntime: &mockRuntime{
 				runtime:           runtimeMock3,
 				setContextStorage: &mockSetContextStorage{trieState: &storage.TrieState{}},
-				version:           &mockVersion{},
 				validateTxn: &mockValidateTxn{
 					input: types.Extrinsic(concatenateByteSlices([][]byte{
 						{byte(types.TxnExternal)},
@@ -415,7 +407,7 @@ func TestServiceHandleTransactionMessage(t *testing.T) {
 							Ver:  3,
 						}},
 						transactionVersion,
-					}, tt.mockRuntime.version.err)
+					}, nil)
 					rt.On("ValidateTransaction", tt.mockRuntime.validateTxn.input).
 						Return(tt.mockRuntime.validateTxn.validity,
 							tt.mockRuntime.validateTxn.validityErr, tt.mockRuntime.validateTxn.err)
