@@ -688,7 +688,8 @@ func (t *Trie) clearPrefixLimitBranch(branch *Node, prefix []byte, limit uint32)
 	newParent = branch
 
 	if bytes.HasPrefix(branch.Key, prefix) {
-		newParent, valuesDeleted, nodesRemoved = t.deleteNodesLimit(branch, limit)
+		nilPrefix := ([]byte)(nil)
+		newParent, valuesDeleted, nodesRemoved = t.deleteNodesLimit(branch, nilPrefix, limit)
 		allDeleted = newParent == nil
 		return newParent, valuesDeleted, nodesRemoved, allDeleted
 	}
@@ -742,7 +743,8 @@ func (t *Trie) clearPrefixLimitChild(branch *Node, prefix []byte, limit uint32) 
 		return newParent, valuesDeleted, nodesRemoved, allDeleted
 	}
 
-	child, valuesDeleted, nodesRemoved = t.deleteNodesLimit(child, limit)
+	nilPrefix := ([]byte)(nil)
+	child, valuesDeleted, nodesRemoved = t.deleteNodesLimit(child, nilPrefix, limit)
 	if valuesDeleted == 0 {
 		allDeleted = branch.Children[childIndex] == nil
 		return branch, valuesDeleted, nodesRemoved, allDeleted
@@ -762,7 +764,7 @@ func (t *Trie) clearPrefixLimitChild(branch *Node, prefix []byte, limit uint32) 
 	return newParent, valuesDeleted, nodesRemoved, allDeleted
 }
 
-func (t *Trie) deleteNodesLimit(parent *Node, limit uint32) (
+func (t *Trie) deleteNodesLimit(parent *Node, prefix []byte, limit uint32) (
 	newParent *Node, valuesDeleted, nodesRemoved uint32) {
 	if limit == 0 {
 		valuesDeleted, nodesRemoved = 0, 0
@@ -781,6 +783,8 @@ func (t *Trie) deleteNodesLimit(parent *Node, limit uint32) (
 
 	branch := parent
 
+	fullKey := concatenateSlices(prefix, branch.Key)
+
 	nilChildren := node.ChildrenCapacity - branch.NumChildren()
 
 	var newDeleted, newNodesRemoved uint32
@@ -792,7 +796,7 @@ func (t *Trie) deleteNodesLimit(parent *Node, limit uint32) (
 
 		copySettings := node.DefaultCopySettings
 		branch = t.prepBranchForMutation(branch, copySettings)
-		branch.Children[i], newDeleted, newNodesRemoved = t.deleteNodesLimit(child, limit)
+		branch.Children[i], newDeleted, newNodesRemoved = t.deleteNodesLimit(child, fullKey, limit)
 		if branch.Children[i] == nil {
 			nilChildren++
 		}
@@ -803,7 +807,7 @@ func (t *Trie) deleteNodesLimit(parent *Node, limit uint32) (
 
 		branch.SetDirty()
 
-		newParent, branchChildMerged = handleDeletion(branch, branch.Key)
+		newParent, branchChildMerged = handleDeletion(branch, fullKey)
 		if branchChildMerged {
 			nodesRemoved++
 		}
