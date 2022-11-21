@@ -31,7 +31,7 @@ type SignatureVerifier struct {
 	invalid bool // Set to true if any signature verification fails.
 	logger  log.LeveledLogger
 	closeCh chan struct{}
-	sync.RWMutex
+	mutex   sync.RWMutex
 	sync.Once
 	sync.WaitGroup
 }
@@ -46,7 +46,6 @@ func NewSignatureVerifier(logger log.LeveledLogger) *SignatureVerifier {
 		init:    false,
 		invalid: false,
 		logger:  logger,
-		RWMutex: sync.RWMutex{},
 		closeCh: make(chan struct{}),
 	}
 }
@@ -54,9 +53,9 @@ func NewSignatureVerifier(logger log.LeveledLogger) *SignatureVerifier {
 // Start signature verification in batch.
 func (sv *SignatureVerifier) Start() {
 	// Update the init state.
-	sv.Lock()
+	sv.mutex.Lock()
 	sv.init = true
-	sv.Unlock()
+	sv.mutex.Unlock()
 
 	sv.WaitGroup.Add(1)
 
@@ -84,22 +83,22 @@ func (sv *SignatureVerifier) Start() {
 
 // IsStarted ...
 func (sv *SignatureVerifier) IsStarted() bool {
-	sv.RLock()
-	defer sv.RUnlock()
+	sv.mutex.RLock()
+	defer sv.mutex.RUnlock()
 	return sv.init
 }
 
 // IsInvalid ...
 func (sv *SignatureVerifier) IsInvalid() bool {
-	sv.RLock()
-	defer sv.RUnlock()
+	sv.mutex.RLock()
+	defer sv.mutex.RUnlock()
 	return sv.invalid
 }
 
 // Invalid ...
 func (sv *SignatureVerifier) Invalid() {
-	sv.RLock()
-	defer sv.RUnlock()
+	sv.mutex.RLock()
+	defer sv.mutex.RUnlock()
 	sv.invalid = true
 }
 
@@ -109,15 +108,15 @@ func (sv *SignatureVerifier) Add(s *SignatureInfo) {
 		return
 	}
 
-	sv.Lock()
-	defer sv.Unlock()
+	sv.mutex.Lock()
+	defer sv.mutex.Unlock()
 	sv.batch = append(sv.batch, s)
 }
 
 // Remove returns the first signature from the batch. Returns nil if batch is empty.
 func (sv *SignatureVerifier) Remove() *SignatureInfo {
-	sv.Lock()
-	defer sv.Unlock()
+	sv.mutex.Lock()
+	defer sv.mutex.Unlock()
 	if len(sv.batch) == 0 {
 		return nil
 	}
@@ -128,8 +127,8 @@ func (sv *SignatureVerifier) Remove() *SignatureInfo {
 
 // Reset reset the signature verifier for reuse.
 func (sv *SignatureVerifier) Reset() {
-	sv.Lock()
-	defer sv.Unlock()
+	sv.mutex.Lock()
+	defer sv.mutex.Unlock()
 	sv.init = false
 	sv.batch = make([]*SignatureInfo, 0)
 	sv.invalid = false
@@ -140,13 +139,13 @@ func (sv *SignatureVerifier) Reset() {
 func (sv *SignatureVerifier) Finish() bool {
 	for {
 		time.Sleep(100 * time.Millisecond)
-		sv.Lock()
+		sv.mutex.Lock()
 		if sv.invalid || len(sv.batch) == 0 {
 			close(sv.closeCh)
-			sv.Unlock()
+			sv.mutex.Unlock()
 			break
 		}
-		sv.RUnlock()
+		sv.mutex.RUnlock()
 	}
 	// Wait till start function to finish and then reset it.
 	sv.Wait()
