@@ -83,7 +83,7 @@ type FullNode struct {
 	// Initial value is set to 1 and is incremented after every block pruning.
 	pendingNumber int64
 	retainBlocks  uint32
-	sync.RWMutex
+	mutex         sync.RWMutex
 }
 
 type journalRecord struct {
@@ -161,8 +161,8 @@ func (p *FullNode) addDeathRow(jr *journalRecord, blockNum int64) {
 		return
 	}
 
-	p.Lock()
-	defer p.Unlock()
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
 	// The block is already pruned.
 	if blockNum < p.pendingNumber {
@@ -214,8 +214,8 @@ func (p *FullNode) start() {
 
 	var canPrune bool
 	checkPruning := func() {
-		p.Lock()
-		defer p.Unlock()
+		p.mutex.Lock()
+		defer p.mutex.Unlock()
 		if uint32(len(p.deathList)) <= p.retainBlocks {
 			canPrune = false
 			return
