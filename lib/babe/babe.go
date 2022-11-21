@@ -46,7 +46,7 @@ type Service struct {
 	keypair *sr25519.Keypair // TODO: change to BABE keystore (#1864)
 
 	// State variables
-	sync.RWMutex
+	mutex sync.RWMutex
 	pause chan struct{}
 
 	telemetry telemetry.Client
@@ -267,8 +267,8 @@ func (b *Service) EpochLength() uint64 {
 
 // Pause pauses the service ie. halts block production
 func (b *Service) Pause() error {
-	b.Lock()
-	defer b.Unlock()
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 
 	if b.IsPaused() {
 		return nil
@@ -280,8 +280,8 @@ func (b *Service) Pause() error {
 
 // Resume resumes the service ie. resumes block production
 func (b *Service) Resume() error {
-	b.Lock()
-	defer b.Unlock()
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 
 	if !b.IsPaused() {
 		return nil
@@ -309,8 +309,8 @@ func (b *Service) Stop() error {
 		return nil
 	}
 
-	b.Lock()
-	defer b.Unlock()
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 
 	if b.ctx.Err() != nil {
 		return errors.New("service already stopped")
