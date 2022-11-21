@@ -34,12 +34,13 @@ type StorageState struct {
 	tries      *Tries
 
 	db chaindb.Database
-	sync.RWMutex
 
 	// change notifiers
 	observerListMutex sync.RWMutex
 	observerList      []Observer
 	pruner            pruner.Pruner
+
+	mutex sync.Mutex
 }
 
 // NewStorageState creates a new StorageState backed by the given block state
@@ -71,6 +72,12 @@ func NewStorageState(db chaindb.Database, blockState *BlockState,
 		pruner:       p,
 	}, nil
 }
+
+// Lock locks the storage state for thread safe access.
+func (s *StorageState) Lock() { s.mutex.Lock() }
+
+// Unlock unlocks the storage state for thread safe access.
+func (s *StorageState) Unlock() { s.mutex.Unlock() }
 
 // StoreTrie stores the given trie in the StorageState and writes it to the database
 func (s *StorageState) StoreTrie(ts *rtstorage.TrieState, header *types.Header) error {
