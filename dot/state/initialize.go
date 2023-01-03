@@ -41,7 +41,9 @@ func (s *Service) Initialise(gen *genesis.Genesis, header *types.Header, t *trie
 		return fmt.Errorf("failed to clear database: %s", err)
 	}
 
-	if err = t.WriteDirty(chaindb.NewTable(db, storagePrefix)); err != nil {
+	storageDatabase := chaindb.NewTable(db, storagePrefix)
+	err = t.WriteDirty(storageDatabase)
+	if err != nil {
 		return fmt.Errorf("failed to write genesis trie to database: %w", err)
 	}
 
@@ -59,7 +61,8 @@ func (s *Service) Initialise(gen *genesis.Genesis, header *types.Header, t *trie
 	rt.Stop()
 
 	// write initial genesis values to database
-	if err = s.storeInitialValues(gen.GenesisData(), t); err != nil {
+	err = s.storeInitialValues(storageDatabase, gen.GenesisData(), t)
+	if err != nil {
 		return fmt.Errorf("failed to write genesis values to database: %s", err)
 	}
 
@@ -139,9 +142,10 @@ func loadGrandpaAuthorities(t *trie.Trie) ([]types.GrandpaVoter, error) {
 }
 
 // storeInitialValues writes initial genesis values to the state database
-func (s *Service) storeInitialValues(data *genesis.Data, t *trie.Trie) error {
+func (s *Service) storeInitialValues(storageDatabase NewBatcher,
+	data *genesis.Data, t *trie.Trie) error {
 	// write genesis trie to database
-	if err := t.WriteDirty(chaindb.NewTable(s.db, storagePrefix)); err != nil {
+	if err := t.WriteDirty(storageDatabase); err != nil {
 		return fmt.Errorf("failed to write trie to database: %s", err)
 	}
 
