@@ -532,6 +532,10 @@ func TestVerifyForkBlocksWithRespectiveEpochData(t *testing.T) {
 		InMemory: true,
 	})
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		err := inMemoryDB.Close()
+		require.NoError(t, err)
+	})
 
 	const epochPrefix = "epoch"
 	epochStateDatabase := chaindb.NewTable(inMemoryDB, epochPrefix)

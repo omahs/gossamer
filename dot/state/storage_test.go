@@ -173,6 +173,10 @@ func TestGetStorageChildAndGetStorageFromChild(t *testing.T) {
 		DataDir: filepath.Join(basepath, "db"),
 	})
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		err = db.Close()
+		require.NoError(t, err)
+	})
 
 	_, genTrie, genHeader := newTestGenesisWithTrieAndHeader(t)
 
