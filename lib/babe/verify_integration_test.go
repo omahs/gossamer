@@ -530,7 +530,6 @@ func TestVerifyForkBlocksWithRespectiveEpochData(t *testing.T) {
 
 	inMemoryDB, err := chaindb.NewBadgerDB(&chaindb.Config{
 		InMemory: true,
-		DataDir:  t.TempDir(),
 	})
 	require.NoError(t, err)
 
