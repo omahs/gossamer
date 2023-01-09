@@ -4,6 +4,7 @@
 package state
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/ChainSafe/gossamer/lib/common"
 	runtime "github.com/ChainSafe/gossamer/lib/runtime/storage"
 	"github.com/ChainSafe/gossamer/lib/trie"
-	"github.com/ChainSafe/gossamer/lib/utils"
 	"github.com/golang/mock/gomock"
 
 	"github.com/stretchr/testify/require"
@@ -169,7 +169,9 @@ func TestStorage_StoreTrie_NotSyncing(t *testing.T) {
 func TestGetStorageChildAndGetStorageFromChild(t *testing.T) {
 	// initialise database using data directory
 	basepath := t.TempDir()
-	db, err := utils.SetupDatabase(basepath, false)
+	db, err := chaindb.NewBadgerDB(&chaindb.Config{
+		DataDir: filepath.Join(basepath, "db"),
+	})
 	require.NoError(t, err)
 
 	_, genTrie, genHeader := newTestGenesisWithTrieAndHeader(t)
