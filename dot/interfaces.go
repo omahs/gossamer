@@ -29,13 +29,13 @@ type ServiceRegisterer interface {
 	Get(srvc interface{}) services.Service
 }
 
-// BlockJustificationVerifier has a verification method for block justifications.
-type BlockJustificationVerifier interface {
+// blockJustificationVerifier has a verification method for block justifications.
+type blockJustificationVerifier interface {
 	VerifyBlockJustification(common.Hash, []byte) ([]byte, error)
 }
 
-// Telemetry is the telemetry client to send telemetry messages.
-type Telemetry interface {
+// telemetryClient is the telemetry client to send telemetry messages.
+type telemetryClient interface {
 	SendMessage(msg json.Marshaler)
 }
 
@@ -67,4 +67,11 @@ type runtimeInterface interface {
 	RandomSeed()
 	OffchainWorker()
 	GenerateSessionKeys()
+}
+
+// keyStore is the keystore interface for the BABE service.
+type keyStore interface {
+	Name() keystore.Name
+	Type() string
+	Keypairs() []keystore.KeyPair
 }
